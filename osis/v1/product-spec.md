@@ -137,7 +137,7 @@ Each successful use reinforces the mental model that responsive image compositio
 
 **Light, technical, confident.** The aesthetic says "developer tool" not "design tool." Clean lines, monospace where appropriate, minimal chrome.
 
-**Light blue as the identity color.** Not Tailwind blue -- Art Direct's own shade. Applied sparingly: backgrounds, accents, the upload box border. Background shifts with the rotating gallery -- each image brings a subtle gradient that matches its palette, with a fine grain texture overlay (like Arc/Dia). The grain adds warmth and texture to what would otherwise be flat color.
+**Light blue as the identity color.** Not Tailwind blue -- Art Direct's own shade. Applied sparingly: backgrounds, accents, the upload box border. Background shifts with the rotating gallery -- each image brings a subtle gradient that matches its palette, with a fine grain texture overlay (like Arc/Dia). The grain adds warmth and texture to what would otherwise be flat color. **In studio mode, the background adapts to the uploaded image** -- extract dominant color, compute a complementary shade, blend into the gradient. The studio feels bespoke to whatever image you're working with.
 
 **Dashed borders for frames.** Frames are not device mockups. They're compositional containers. Dashed borders communicate "this is a boundary you're working within" without pretending to be a phone or laptop.
 
