@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --color-art-50: #f0f5ff;
+  --color-art-100: #e0ebff;
+  --color-art-200: #c2d7ff;
+  --color-art-300: #8ab4ff;
+  --color-art-400: #4d8eff;
+  --color-art-500: #2563eb;
+  --color-art-600: #1d4ed8;
+  --color-art-700: #1e3a8a;
+  --color-surface: #fafbfe;
+  --color-surface-warm: #f8f6f3;
+  --color-ink: #111827;
+  --color-ink-secondary: #6b7280;
+  --color-ink-muted: #9ca3af;
+  --color-studio-bg: #0c0c0f;
+  --color-studio-surface: #18181b;
+  --color-studio-border: #27272a;
+  --color-studio-text: #e4e4e7;
+  --color-studio-muted: #71717a;
+  --font-display: "Instrument Serif", "Georgia", serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.grain-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* Smooth page-level transitions */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Landing entrance animations */
+@keyframes landing-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes landing-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes landing-scale {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.anim-rise {
+  animation: landing-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.anim-fade {
+  animation: landing-fade 0.6s ease both;
+}
+.anim-scale {
+  animation: landing-scale 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Page-level drag overlay */
+.drag-overlay {
+  background: radial-gradient(ellipse at center, rgba(37, 99, 235, 0.06) 0%, transparent 70%);
+}
+
+/* Custom scrollbar for studio */
+.studio-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.studio-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.studio-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+}
+.studio-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}

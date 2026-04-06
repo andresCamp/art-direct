@@ -13,7 +13,7 @@ Read osis/twin.md and the active specs in osis/ before working on any product fe
 ## Architecture Decisions
 
 - **Static site, no backend.** Everything runs client-side. No accounts, no persistence, no image uploads to a server. Images are blob URLs.
-- **Framework:** Not yet chosen. Next.js is likely given the developer's experience, but this is a simple static tool — could be anything that deploys to artdirect.dev.
+- **Framework:** Astro with Svelte 5 islands. Tailwind CSS v4 via `@tailwindcss/vite`.
 - **Output is Tailwind class strings.** The tool maps visual manipulations (drag, zoom, pan) to Tailwind utilities scoped per breakpoint. Zero runtime in the consumer's app.
 
 ## Design Direction
