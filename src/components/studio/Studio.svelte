@@ -38,7 +38,7 @@
   <div class="grain-overlay fixed inset-0 opacity-[0.04] mix-blend-overlay pointer-events-none z-50"></div>
 
   <!-- Floating top bar -->
-  <div class="fixed top-0 inset-x-0 z-20 flex items-center px-5 py-4">
+  <div class="fixed top-0 inset-x-0 z-20 flex items-center px-5 py-3 md:py-4">
     <button
       type="button"
       class="cursor-pointer relative flex items-center gap-2 text-studio-muted/50 hover:text-studio-text transition-colors duration-200 before:absolute before:-inset-4 before:content-['']"
@@ -69,7 +69,7 @@
       />
     </div>
 
-    <div class="ml-auto flex items-center">
+    <div class="ml-auto hidden md:flex items-center">
       {#if store.image}
         <input
           type="text"
@@ -88,7 +88,7 @@
   </div>
 
   <!-- View mode toggle — below top bar, centered -->
-  <div class="fixed top-14 left-1/2 -translate-x-1/2 z-20 transition-all duration-300 ease-out {activeTab !== 'compose' ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}">
+  <div class="fixed top-12 md:top-14 left-1/2 -translate-x-1/2 z-20 transition-all duration-300 ease-out {activeTab !== 'compose' ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}">
     <Toggle
       options={['Devices', 'Tailwind']}
       active={store.viewMode === 'device' ? 0 : 1}

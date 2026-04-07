@@ -1,5 +1,8 @@
 <script lang="ts">
   import { store } from '../../lib/store.svelte'
+  import { MediaQuery } from 'svelte/reactivity'
+
+  const narrowViewport = new MediaQuery('(max-width: 639px)')
 
   interface PreviewDevice {
     id: string
@@ -81,8 +84,8 @@
     isResizingY = false
   }
 
-  const maxDisplayWidth = 900
-  const maxDisplayHeight = 550
+  const maxDisplayWidth = $derived(narrowViewport.current ? 340 : 900)
+  const maxDisplayHeight = $derived(narrowViewport.current ? 400 : 550)
   const displayScale = $derived(
     Math.min(maxDisplayWidth / width, maxDisplayHeight / height, 1)
   )
@@ -158,11 +161,11 @@
 
 <div class="flex flex-col items-center gap-4 w-full h-full">
   <!-- Device presets + dimensions -->
-  <div class="flex items-center gap-3 flex-shrink-0">
+  <div class="flex items-center gap-3 flex-shrink-0 overflow-x-auto max-w-full px-4">
     {#each presets as preset}
       <button
         type="button"
-        class="cursor-pointer text-[11px] font-mono transition-colors duration-200
+        class="cursor-pointer text-[11px] font-mono py-2 sm:py-0 whitespace-nowrap transition-colors duration-200
           {activePreset === preset.id
             ? 'text-studio-text'
             : 'text-studio-muted/50 hover:text-studio-muted'}"

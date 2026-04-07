@@ -25,7 +25,7 @@
   <div class="relative">
     <button
       type="button"
-      class="text-[11px] font-medium text-studio-muted hover:text-studio-text transition-colors duration-200 flex items-center gap-1"
+      class="text-[11px] font-medium text-studio-muted hover:text-studio-text transition-colors duration-200 flex items-center gap-1 py-2 sm:py-0"
       onclick={() => { open = !open }}
       onpointerdown={(e) => e.stopPropagation()}
     >
@@ -65,7 +65,7 @@
   <!-- Orientation toggle -->
   <button
     type="button"
-    class="text-studio-muted/40 hover:text-studio-muted transition-colors duration-200"
+    class="text-studio-muted/40 hover:text-studio-muted transition-colors duration-200 p-2 sm:p-0"
     onclick={() => store.toggleOrientation(category)}
     onpointerdown={(e) => e.stopPropagation()}
     aria-label="Toggle orientation"

@@ -2,6 +2,9 @@
   import { galleryItems } from '../../lib/gallery-data'
   import { generateClassString } from '../../lib/class-generator'
   import { cubicOut } from 'svelte/easing'
+  import { MediaQuery } from 'svelte/reactivity'
+
+  const smallScreen = new MediaQuery('(max-width: 639px)')
 
   let activeIndex = $state(0)
   let intervalId: ReturnType<typeof setInterval>
@@ -75,7 +78,11 @@
 
   const displayBreakpoints = ['base', 'lg', 'xl'] as const
   const bpLabels: Record<string, string> = { base: 'Mobile', lg: 'Tablet', xl: 'Desktop' }
-  const bpWidths: Record<string, number> = { base: 140, lg: 280, xl: 420 }
+  const bpWidths = $derived(
+    smallScreen.current
+      ? { base: 140, lg: 220, xl: 280 }
+      : { base: 140, lg: 280, xl: 420 }
+  )
   const bpAspects: Record<string, string> = { base: '9/16', lg: '4/3', xl: '16/9' }
   // Typical viewport widths each breakpoint targets — used to scale translate values
   const bpViewports: Record<string, number> = { base: 393, lg: 1024, xl: 1280 }
@@ -92,11 +99,11 @@
 >
   <div class="grain-overlay absolute inset-0 opacity-15 mix-blend-overlay pointer-events-none"></div>
 
-  <div class="relative z-10 max-w-6xl mx-auto px-6 py-6 lg:py-8">
-    <div class="relative" style:min-height="390px">
+  <div class="relative z-10 max-w-6xl mx-auto px-3 sm:px-6 py-6 lg:py-8">
+    <div class="relative" style:min-height={smallScreen.current ? undefined : '390px'}>
     {#key activeIndex}
       <div
-        class="absolute inset-x-0 top-0 will-change-[opacity,transform,filter]"
+        class="{smallScreen.current ? '' : 'absolute inset-x-0 top-0'} will-change-[opacity,transform,filter]"
         in:emerge
         out:recede
       >
@@ -111,7 +118,7 @@
         </div>
 
         <!-- Frames -->
-        <div class="flex justify-center items-end gap-3 md:gap-6">
+        <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:items-end md:gap-6">
           {#each displayBreakpoints as bpName}
             {@const frame = activeItem.frames.find(f => f.breakpoint === bpName)}
             {#if frame}
@@ -120,7 +127,8 @@
                 <span class="text-[10px] font-mono text-white/35 tracking-wider uppercase">{bpLabels[bpName]}</span>
                 <div
                   class="relative border border-white/15 rounded-lg overflow-hidden backdrop-blur-sm bg-black/20"
-                  style:width="{bpWidths[bpName]}px"
+                  style:width="{smallScreen.current ? '100%' : bpWidths[bpName] + 'px'}"
+                  style:max-width="{bpWidths[bpName]}px"
                 >
                   <div class="overflow-hidden" style:aspect-ratio={bpAspects[bpName]}>
                     <img

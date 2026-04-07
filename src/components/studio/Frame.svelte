@@ -23,6 +23,44 @@
   let dragOrigin = $state({ x: 0, y: 0 })
   let dragOriginPos = $state({ x: 50, y: 50 })
 
+  // --- Touch pinch-to-zoom state ---
+  let isPinching = $state(false)
+  let touchOrigin = $state({ dist: 0, scale: 1, tx: 0, ty: 0 })
+
+  function getTouchInfo(t1: Touch, t2: Touch) {
+    return {
+      dist: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY),
+      midX: (t1.clientX + t2.clientX) / 2,
+      midY: (t1.clientY + t2.clientY) / 2,
+    }
+  }
+
+  function onTouchStart(e: TouchEvent) {
+    if (!isActive || e.touches.length < 2) return
+    isPinching = true
+    isDragging = false
+    const info = getTouchInfo(e.touches[0], e.touches[1])
+    touchOrigin = { dist: info.dist, scale: frame.scale, tx: frame.translateX, ty: frame.translateY }
+  }
+
+  function onTouchMove(e: TouchEvent) {
+    if (!isPinching || e.touches.length < 2) return
+    if (isCover) {
+      store.updateFrame(frame.breakpoint, { objectFit: 'contain', objectPosition: 'center' })
+      isPinching = false
+      return
+    }
+    const info = getTouchInfo(e.touches[0], e.touches[1])
+    const ratio = info.dist / touchOrigin.dist
+    const newScale = Math.round(Math.max(0.1, Math.min(10, touchOrigin.scale * ratio)) * 100) / 100
+    store.updateFrame(frame.breakpoint, { scale: newScale })
+  }
+
+  function onTouchEnd(e: TouchEvent) {
+    if (!isPinching) return
+    if (e.touches.length < 2) isPinching = false
+  }
+
   // --- Ghost image visibility (hover-based) ---
   let isHovering = $state(false)
   let showOverflow = $state(false)
@@ -202,7 +240,7 @@
   }
 
   function onPointerMove(e: PointerEvent) {
-    if (!isDragging) return
+    if (!isDragging || isPinching) return
     if (!didDrag) {
       const dx = Math.abs(e.clientX - dragStart.x)
       const dy = Math.abs(e.clientY - dragStart.y)
@@ -300,6 +338,9 @@
   onwheel={onWheel}
   onmouseenter={() => { isHovering = true }}
   onmouseleave={() => { isHovering = false }}
+  ontouchstart={onTouchStart}
+  ontouchmove={onTouchMove}
+  ontouchend={onTouchEnd}
 >
   <!-- Header -->
   <div class="flex items-center justify-between mb-1.5 px-0.5 relative z-30">

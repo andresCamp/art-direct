@@ -125,10 +125,9 @@
 {#if store.classString}
 <div
   bind:this={panelEl}
-  class="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 rounded-sm border border-studio-border/30 bg-studio-bg transition-[width] duration-300 ease-out"
+  class="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 rounded-sm border border-studio-border/30 bg-studio-bg transition-[width] duration-300 ease-out max-w-[calc(100%-2.5rem)]"
   class:cursor-pointer={!expanded}
   class:w-3xl={expanded}
-  class:max-w-[calc(100%-2.5rem)]={expanded}
   onclick={() => {
     const next = !expanded
     expanded = next

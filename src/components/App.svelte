@@ -75,7 +75,7 @@
     </div>
   {:else}
     <div class={transitioning ? 'opacity-0 scale-98 transition-all duration-400' : 'opacity-100 scale-100 transition-all duration-400'}>
-      <main class="h-[100dvh] flex flex-col max-w-7xl mx-auto w-full px-10 lg:px-16 xl:px-20">
+      <main class="min-h-[100dvh] flex flex-col max-w-7xl mx-auto w-full px-5 md:px-10 lg:px-16 xl:px-20">
         <!-- Top: Hero copy + Upload CTA, vertically centered in their space -->
         <div class="flex flex-col md:flex-row md:items-center gap-6 md:gap-8 lg:gap-10 pt-[8vh] md:pt-[12vh] pb-[4vh] md:pb-[6vh]">
           <Hero />

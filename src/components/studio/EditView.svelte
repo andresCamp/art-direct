@@ -1,9 +1,12 @@
 <script lang="ts">
   import { store } from '../../lib/store.svelte'
   import { BREAKPOINTS, DISPLAY_WIDTHS } from '../../lib/breakpoints'
+  import { MediaQuery } from 'svelte/reactivity'
   import Frame from './Frame.svelte'
   import DevicePicker from './DevicePicker.svelte'
   import type { BreakpointName } from '../../lib/types'
+
+  const narrowViewport = new MediaQuery('(max-width: 639px)')
 
   const frameList = $derived(
     store.viewMode === 'device'
@@ -46,9 +49,11 @@
 
   function getBaseWidth(bpName: BreakpointName, deviceWidth?: number): number {
     if (deviceWidth) {
-      return deviceWidth < 600 ? 220 : deviceWidth < 1100 ? 320 : 480
+      const base = deviceWidth < 600 ? 220 : deviceWidth < 1100 ? 320 : 480
+      return narrowViewport.current ? Math.round(base * 0.55) : base
     }
-    return DISPLAY_WIDTHS[bpName]
+    const w = DISPLAY_WIDTHS[bpName]
+    return narrowViewport.current ? Math.round(w * 0.55) : w
   }
 
   function getAllocatedWidth(bpName: BreakpointName, isActive: boolean, deviceWidth?: number): number {
@@ -61,7 +66,14 @@
   // Reset pan when frame list changes (e.g. switching device/tailwind mode)
   $effect(() => {
     frameList; // track dependency
-    panX = 0
+    // On mobile, start left-aligned so the first frame is visible
+    if (narrowViewport.current && containerEl && stripEl) {
+      requestAnimationFrame(() => {
+        panX = getMaxPan()
+      })
+    } else {
+      panX = 0
+    }
   })
 
   // --- Horizontal panning (no overflow container) ---
@@ -82,8 +94,43 @@
     return Math.max(-max, Math.min(max, val))
   }
 
+  // Auto-center focused frame on mobile
+  $effect(() => {
+    const bp = store.activeBreakpoint
+    if (!bp || !narrowViewport.current || !containerEl) return
+    const idx = frameList.findIndex(f => f.frame?.breakpoint === bp)
+    if (idx < 0) return
+    // Compute the center of the target frame from allocated widths + gaps
+    const gap = 24 // gap-6 = 24px
+    let offset = 0
+    for (let i = 0; i < idx; i++) {
+      const item = frameList[i]
+      const w = item.bp ? getAllocatedWidth(item.bp.name, false, item.device?.width) : 0
+      offset += w + gap
+    }
+    const activeItem = frameList[idx]
+    const activeW = activeItem.bp ? getAllocatedWidth(activeItem.bp.name, true, activeItem.device?.width) : 0
+    const frameCenter = offset + activeW / 2
+    // Total strip width
+    let totalWidth = 0
+    for (let i = 0; i < frameList.length; i++) {
+      const item = frameList[i]
+      const w = item.bp ? getAllocatedWidth(item.bp.name, i === idx, item.device?.width) : 0
+      totalWidth += w
+    }
+    totalWidth += gap * (frameList.length - 1)
+    // The strip is centered in the container, so its natural center is at containerCenter
+    const containerCenter = containerEl.clientWidth / 2
+    const stripStart = containerCenter - totalWidth / 2
+    const frameCenterAbsolute = stripStart + frameCenter
+    // Pan to put frameCenterAbsolute at containerCenter
+    const targetPan = containerCenter - frameCenterAbsolute
+    panX = clampPan(targetPan)
+  })
+
   function onBgPointerDown(e: PointerEvent) {
-    // Only pan from background, not from frames
+    // Only pan from background, not from frames; disable when a frame is focused
+    if (hasSelection) return
     const target = e.target as HTMLElement
     if (target.closest('[data-frame-wrapper]')) return
     isPanning = true
@@ -102,6 +149,7 @@
   }
 
   function onBgWheel(e: WheelEvent) {
+    if (hasSelection) return
     // Horizontal scroll with mouse wheel (shift+wheel or trackpad horizontal)
     const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
     const max = getMaxPan()
@@ -113,7 +161,7 @@
 
 <div
   bind:this={containerEl}
-  class="w-full h-full flex items-center justify-center"
+  class="relative w-full h-full flex items-center justify-center"
   class:cursor-grab={!isPanning}
   class:cursor-grabbing={isPanning}
   onpointerdown={onBgPointerDown}
@@ -124,7 +172,7 @@
   <div
     bind:this={stripEl}
     class={[
-      'flex items-end gap-6 md:gap-8 px-8 transition-transform duration-150 ease-out',
+      'flex items-end gap-6 md:gap-8 px-8 transition-transform duration-300 ease-out',
       store.viewMode === 'device' && 'justify-center'
     ]}
     style:transform="translateX({panX}px)"
@@ -157,4 +205,14 @@
       </div>
     {/each}
   </div>
+
+  <!-- Fade edges to hint at off-screen content (mobile only) -->
+  <div
+    class="fixed left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-studio-bg to-transparent pointer-events-none z-10 transition-opacity duration-300 md:hidden"
+    style:opacity={panX < -10 ? 0.6 : 0}
+  ></div>
+  <div
+    class="fixed right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-studio-bg to-transparent pointer-events-none z-10 transition-opacity duration-300 md:hidden"
+    style:opacity={panX > 10 ? 0.6 : 0}
+  ></div>
 </div>
