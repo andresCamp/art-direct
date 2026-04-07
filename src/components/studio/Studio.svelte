@@ -82,6 +82,7 @@
             e.currentTarget.setSelectionRange(0, dot > 0 ? dot : val.length)
           }}
           oninput={(e) => store.setFilename(e.currentTarget.value)}
+          onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
         />
       {/if}
     </div>
