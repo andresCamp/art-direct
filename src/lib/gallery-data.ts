@@ -10,17 +10,31 @@ export interface GalleryItem {
 
 export const galleryItems: GalleryItem[] = [
   {
+    id: 'napoleon',
+    image: '/gallery/napoleon.jpg',
+    label: 'Napoleon Crossing the Alps, David',
+    gradient: ['#4a3a2a', '#8a7a6a'],
+    frames: [
+      // Mobile: tight on Napoleon — contain + zoom into the figure
+      { breakpoint: 'base', scale: 2.5, translateX: -27, translateY: 34, objectFit: 'contain', objectPosition: 'center', transformOrigin: 'center' },
+      // Tablet: cover, focused on upper body and gesture
+      { breakpoint: 'lg', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '50% 20%', transformOrigin: 'center' },
+      // Desktop: slightly more sky visible
+      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '50% 13%', transformOrigin: 'center' },
+    ],
+  },
+  {
     id: 'wave',
     image: '/gallery/wave.jpg',
     label: 'The Great Wave off Kanagawa, Hokusai',
     gradient: ['#1a3a5c', '#c8b88a'],
     frames: [
-      // Mobile: tight on the wave crest
-      { breakpoint: 'base', scale: 2.2, translateX: -4, translateY: 3, objectFit: 'cover', objectPosition: 'center', transformOrigin: 'left' },
-      // Tablet: wave and boats visible
-      { breakpoint: 'md', scale: 1.3, translateX: -2, translateY: 0, objectFit: 'cover', objectPosition: 'left', transformOrigin: 'center' },
-      // Desktop: full composition with Fuji
-      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: 'center', transformOrigin: 'center' },
+      // Mobile: centered on the wave
+      { breakpoint: 'base', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '45% 50%', transformOrigin: 'center' },
+      // Tablet: anchored left, showing wave and boats
+      { breakpoint: 'lg', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: 'left', transformOrigin: 'center' },
+      // Desktop: full composition with Fuji, anchored bottom
+      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: 'bottom', transformOrigin: 'center' },
     ],
   },
   {
@@ -30,11 +44,11 @@ export const galleryItems: GalleryItem[] = [
     gradient: ['#8a7a60', '#c4b8a0'],
     frames: [
       // Mobile: the hands, the iconic moment
-      { breakpoint: 'base', scale: 3, translateX: 1, translateY: 2, objectFit: 'cover', objectPosition: 'center', transformOrigin: 'center' },
-      // Tablet: God reaching toward Adam
-      { breakpoint: 'md', scale: 1.4, translateX: 2, translateY: 0, objectFit: 'cover', objectPosition: 'right', transformOrigin: 'center' },
-      // Desktop: full fresco
-      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: 'center', transformOrigin: 'center' },
+      { breakpoint: 'base', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '34% 50%', transformOrigin: 'center' },
+      // Tablet: wider view showing both figures
+      { breakpoint: 'lg', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '15% 50%', transformOrigin: 'center' },
+      // Desktop: nearly full fresco
+      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '12% 50%', transformOrigin: 'center' },
     ],
   },
   {
@@ -43,26 +57,12 @@ export const galleryItems: GalleryItem[] = [
     label: 'Wheatfield with Crows, Van Gogh',
     gradient: ['#2a3a5c', '#c4a830'],
     frames: [
-      // Mobile: the ominous sky, crows in flight
-      { breakpoint: 'base', scale: 1.8, translateX: 0, translateY: -4, objectFit: 'cover', objectPosition: 'top', transformOrigin: 'center' },
-      // Tablet: sky meets the wheatfield path
-      { breakpoint: 'md', scale: 1.2, translateX: 0, translateY: -1, objectFit: 'cover', objectPosition: 'center', transformOrigin: 'center' },
+      // Mobile: the path and crows
+      { breakpoint: 'base', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '62% 50%', transformOrigin: 'center' },
+      // Tablet: wider sky and field
+      { breakpoint: 'lg', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '71% 50%', transformOrigin: 'center' },
       // Desktop: full panorama
-      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: 'center', transformOrigin: 'center' },
-    ],
-  },
-  {
-    id: 'napoleon',
-    image: '/gallery/napoleon.jpg',
-    label: 'Napoleon Crossing the Alps, David',
-    gradient: ['#4a3a2a', '#8a7a6a'],
-    frames: [
-      // Mobile: Napoleon's commanding gesture
-      { breakpoint: 'base', scale: 1.6, translateX: 0, translateY: -6, objectFit: 'cover', objectPosition: 'top', transformOrigin: 'center' },
-      // Tablet: horse and rider
-      { breakpoint: 'md', scale: 1.1, translateX: 0, translateY: -2, objectFit: 'cover', objectPosition: 'top', transformOrigin: 'center' },
-      // Desktop: full painting
-      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: 'center', transformOrigin: 'center' },
+      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '76% 50%', transformOrigin: 'center' },
     ],
   },
   {
@@ -71,12 +71,12 @@ export const galleryItems: GalleryItem[] = [
     label: 'Whaam!, Roy Lichtenstein',
     gradient: ['#7a8aa0', '#cc2222'],
     frames: [
-      // Mobile: the explosion, the payoff
-      { breakpoint: 'base', scale: 2, translateX: 6, translateY: 0, objectFit: 'cover', objectPosition: 'right', transformOrigin: 'right' },
-      // Tablet: jet firing into explosion
-      { breakpoint: 'md', scale: 1.1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: 'center', transformOrigin: 'center' },
-      // Desktop: full diptych
-      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: 'center', transformOrigin: 'center' },
+      // Mobile: tight on the explosion — contain + zoom
+      { breakpoint: 'base', scale: 5.68, translateX: -159, translateY: 2, objectFit: 'contain', objectPosition: 'center', transformOrigin: 'center' },
+      // Tablet: cover, focused on impact side
+      { breakpoint: 'lg', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '61% 50%', transformOrigin: 'center' },
+      // Desktop: more of the full diptych
+      { breakpoint: 'xl', scale: 1, translateX: 0, translateY: 0, objectFit: 'cover', objectPosition: '53% 50%', transformOrigin: 'center' },
     ],
   },
 ]

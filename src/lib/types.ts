@@ -26,4 +26,4 @@ export interface ImageState {
   naturalHeight: number
 }
 
-export type OutputFormat = 'img' | 'nextjs-image' | 'bg-div' | 'agent-instruction'
+export type OutputFormat = 'img' | 'nextjs-image' | 'bg-div' | 'css' | 'agent-instruction'

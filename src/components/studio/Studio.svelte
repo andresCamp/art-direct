@@ -42,7 +42,13 @@
     <button
       type="button"
       class="cursor-pointer relative flex items-center gap-2 text-studio-muted/50 hover:text-studio-text transition-colors duration-200 before:absolute before:-inset-4 before:content-['']"
-      onclick={() => store.reset()}
+      onclick={() => {
+        window.posthog?.capture('session_reset', {
+          modified_breakpoints_count: store.modifiedBreakpoints.size,
+          output_format: store.outputFormat,
+        })
+        store.reset()
+      }}
     >
       <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -54,7 +60,11 @@
       <Toggle
         options={['Compose', 'Preview']}
         active={activeTab === 'compose' ? 0 : 1}
-        onToggle={() => { activeTab = activeTab === 'compose' ? 'preview' : 'compose' }}
+        onToggle={() => {
+          const next = activeTab === 'compose' ? 'preview' : 'compose'
+          activeTab = next
+          window.posthog?.capture('studio_tab_switched', { tab: next })
+        }}
         size="md"
       />
     </div>
@@ -82,7 +92,11 @@
     <Toggle
       options={['Devices', 'Tailwind']}
       active={store.viewMode === 'device' ? 0 : 1}
-      onToggle={() => store.setViewMode(store.viewMode === 'device' ? 'tailwind' : 'device')}
+      onToggle={() => {
+        const next = store.viewMode === 'device' ? 'tailwind' : 'device'
+        store.setViewMode(next)
+        window.posthog?.capture('view_mode_changed', { view_mode: next })
+      }}
       showUnderline={false}
     />
   </div>

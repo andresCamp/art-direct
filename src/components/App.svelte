@@ -17,6 +17,11 @@
       setTimeout(() => {
         showStudio = true
         transitioning = false
+        window.posthog?.capture('studio_entered', {
+          filename: store.image?.filename,
+          image_width: store.image?.naturalWidth,
+          image_height: store.image?.naturalHeight,
+        })
       }, 400)
     }
     if (!store.image && showStudio) {

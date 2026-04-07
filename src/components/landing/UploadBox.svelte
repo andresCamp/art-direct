@@ -21,7 +21,7 @@
 
 <div class="flex-1 anim-rise" style="animation-delay: 120ms">
   <button
-    class="group w-full border-2 border-dashed rounded-2xl p-20 lg:p-24 text-center cursor-pointer transition-all duration-300
+    class="group w-full border-2 border-dashed rounded-2xl px-20 py-24 lg:px-24 lg:py-30 text-center cursor-pointer transition-all duration-300
       {pageDragging
         ? 'border-art-500 bg-art-100/60 scale-[1.02]'
         : 'border-art-300/60 bg-white/40 hover:border-art-400 hover:bg-white/60 hover:scale-[1.01]'}"

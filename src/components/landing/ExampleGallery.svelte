@@ -1,42 +1,88 @@
 <script lang="ts">
   import { galleryItems } from '../../lib/gallery-data'
   import { generateClassString } from '../../lib/class-generator'
+  import { cubicOut } from 'svelte/easing'
 
   let activeIndex = $state(0)
   let intervalId: ReturnType<typeof setInterval>
-  let transitioning = $state(false)
+  let directedTimerId: ReturnType<typeof setTimeout>
+  let showDirected = $state(false)
 
   const activeItem = $derived(galleryItems[activeIndex])
   const classString = $derived(generateClassString(activeItem.frames))
 
+  function startCycle() {
+    // Start "without" → morph to "with" after 1.5s
+    showDirected = false
+    clearTimeout(directedTimerId)
+    directedTimerId = setTimeout(() => { showDirected = true }, 2500)
+  }
+
   $effect(() => {
+    startCycle()
     intervalId = setInterval(() => {
       transitionTo((activeIndex + 1) % galleryItems.length)
-    }, 5000)
-    return () => clearInterval(intervalId)
+    }, 8000)
+    return () => {
+      clearInterval(intervalId)
+      clearTimeout(directedTimerId)
+    }
   })
+
+  function enableTransitions() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => { mounted = true })
+    })
+  }
 
   function transitionTo(index: number) {
     if (index === activeIndex) return
-    transitioning = true
-    setTimeout(() => {
-      activeIndex = index
-      transitioning = false
-    }, 300)
+    mounted = false
+    activeIndex = index
+    startCycle()
+    enableTransitions()
   }
 
   function goTo(index: number) {
+    window.posthog?.capture('gallery_example_navigated', {
+      from_label: galleryItems[activeIndex]?.label,
+      to_label: galleryItems[index]?.label,
+      to_index: index,
+    })
     transitionTo(index)
     clearInterval(intervalId)
     intervalId = setInterval(() => {
       transitionTo((activeIndex + 1) % galleryItems.length)
-    }, 5000)
+    }, 8000)
   }
 
-  const displayBreakpoints = ['base', 'md', 'xl'] as const
-  const bpLabels: Record<string, string> = { base: 'Mobile', md: 'Tablet', xl: 'Desktop' }
-  const bpWidths: Record<string, number> = { base: 140, md: 280, xl: 420 }
-  const bpAspects: Record<string, string> = { base: '9/16', md: '4/3', xl: '16/9' }
+  let mounted = $state(false)
+  $effect(() => { enableTransitions() })
+
+  function recede(_node: Element) {
+    return {
+      duration: 350, easing: cubicOut,
+      css: (t: number) => `opacity: ${t}; transform: scale(${0.98 + 0.02 * t}); filter: blur(${(1 - t) * 1.5}px)`,
+    }
+  }
+
+  function emerge(_node: Element) {
+    return {
+      duration: 400, delay: 250, easing: cubicOut,
+      css: (t: number) => `opacity: ${t}; transform: scale(${0.98 + 0.02 * t})`,
+    }
+  }
+
+  const displayBreakpoints = ['base', 'lg', 'xl'] as const
+  const bpLabels: Record<string, string> = { base: 'Mobile', lg: 'Tablet', xl: 'Desktop' }
+  const bpWidths: Record<string, number> = { base: 140, lg: 280, xl: 420 }
+  const bpAspects: Record<string, string> = { base: '9/16', lg: '4/3', xl: '16/9' }
+  // Typical viewport widths each breakpoint targets — used to scale translate values
+  const bpViewports: Record<string, number> = { base: 393, lg: 1024, xl: 1280 }
+
+  function scaleRatio(bpName: string): number {
+    return bpWidths[bpName] / bpViewports[bpName]
+  }
 </script>
 
 <section
@@ -46,56 +92,76 @@
 >
   <div class="grain-overlay absolute inset-0 opacity-15 mix-blend-overlay pointer-events-none"></div>
 
-  <div class="relative z-10 max-w-6xl mx-auto px-6 py-8 lg:py-10">
-    <!-- Frames -->
-    <div class="flex justify-center items-end gap-3 md:gap-6">
-      {#each displayBreakpoints as bpName}
-        {@const frame = activeItem.frames.find(f => f.breakpoint === bpName)}
-        {#if frame}
-          <div class="flex flex-col items-center gap-2">
-            <span class="text-[10px] font-mono text-white/35 tracking-wider uppercase">{bpLabels[bpName]}</span>
-            <div
-              class="border border-white/15 rounded-lg overflow-hidden backdrop-blur-sm bg-black/20 transition-all duration-500 {transitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}"
-              style:width="{bpWidths[bpName]}px"
-            >
-              <div class="overflow-hidden" style:aspect-ratio={bpAspects[bpName]}>
-                <img
-                  src={activeItem.image}
-                  alt={activeItem.label}
-                  draggable="false"
-                  class="w-full h-full pointer-events-none transition-all duration-700"
-                  style:object-fit={frame.objectFit}
-                  style:object-position={frame.objectPosition}
-                  style:transform="scale({frame.scale}) translate({frame.translateX * 4}px, {frame.translateY * 4}px)"
-                  style:transform-origin={frame.transformOrigin}
-                />
-              </div>
-            </div>
+  <div class="relative z-10 max-w-6xl mx-auto px-6 py-6 lg:py-8">
+    <div class="relative" style:min-height="390px">
+    {#key activeIndex}
+      <div
+        class="absolute inset-x-0 top-0 will-change-[opacity,transform,filter]"
+        in:emerge
+        out:recede
+      >
+        <!-- Before/after label + progress -->
+        <div class="flex flex-col items-center gap-2 mb-4">
+          <span class="text-xs font-mono tracking-widest uppercase transition-all duration-700 {showDirected ? 'text-white/70' : 'text-white/40'}">
+            {showDirected ? 'with art direct' : 'without art direct'}
+          </span>
+          <div class="w-16 h-px bg-white/10 rounded-full overflow-hidden">
+            <div class="h-full bg-white/40 rounded-full gallery-progress"></div>
           </div>
-        {/if}
-      {/each}
-    </div>
+        </div>
 
-    <!-- Class string -->
-    <div class="mt-6 max-w-3xl mx-auto transition-all duration-500 {transitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}">
-      <pre class="text-[11px] font-mono text-white/40 bg-black/25 backdrop-blur-sm rounded-lg px-5 py-3.5 overflow-x-auto whitespace-nowrap border border-white/5">{classString}</pre>
-    </div>
+        <!-- Frames -->
+        <div class="flex justify-center items-end gap-3 md:gap-6">
+          {#each displayBreakpoints as bpName}
+            {@const frame = activeItem.frames.find(f => f.breakpoint === bpName)}
+            {#if frame}
+              {@const sr = scaleRatio(bpName)}
+              <div class="flex flex-col items-center gap-2">
+                <span class="text-[10px] font-mono text-white/35 tracking-wider uppercase">{bpLabels[bpName]}</span>
+                <div
+                  class="relative border border-white/15 rounded-lg overflow-hidden backdrop-blur-sm bg-black/20"
+                  style:width="{bpWidths[bpName]}px"
+                >
+                  <div class="overflow-hidden" style:aspect-ratio={bpAspects[bpName]}>
+                    <img
+                      src={activeItem.image}
+                      alt={activeItem.label}
+                      draggable="false"
+                      class="w-full h-full pointer-events-none ease-out {mounted ? 'transition-all duration-2000' : ''}"
+                      style:object-fit={frame.objectFit}
+                      style:object-position={showDirected ? frame.objectPosition : 'center'}
+                      style:scale={showDirected ? frame.scale : 1}
+                      style:translate={showDirected ? `${frame.translateX * 4 * sr}px ${frame.translateY * 4 * sr}px` : '0px 0px'}
+                      style:transform-origin={frame.transformOrigin}
+                    />
+                  </div>
+                  {#if bpName === 'xl'}
+                    <p class="absolute bottom-2 left-3 right-3 text-[9px] font-mono text-white/30 truncate">{activeItem.label}</p>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+          {/each}
+        </div>
 
-    <!-- Label + dots -->
-    <div class="flex items-center justify-between mt-4">
-      <div class="flex gap-2.5">
-        {#each galleryItems as item, i}
-          <button
-            type="button"
-            class="w-1.5 h-1.5 rounded-full transition-all duration-300 {i === activeIndex ? 'bg-white/80 scale-150' : 'bg-white/25 hover:bg-white/40'}"
-            onclick={() => goTo(i)}
-            aria-label="Show {item.label}"
-          ></button>
-        {/each}
+        <!-- Class string -->
+        <div class="mt-6 max-w-3xl mx-auto">
+          <pre class="text-[11px] font-mono text-white/40 bg-black/25 backdrop-blur-sm rounded-lg px-5 py-3.5 whitespace-pre-wrap break-all border border-white/5 line-clamp-2">{classString}</pre>
+        </div>
       </div>
-      <p class="text-[10px] text-white/25 font-mono tracking-wide transition-all duration-500 {transitioning ? 'opacity-0' : 'opacity-100'}">
-        {activeItem.label}
-      </p>
+    {/key}
     </div>
+
   </div>
 </section>
+
+<style>
+  .gallery-progress {
+    animation: progress-fill 8s linear forwards;
+  }
+
+  @keyframes progress-fill {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
+</style>

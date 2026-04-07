@@ -8,6 +8,7 @@
     { value: 'img', label: '<img>' },
     { value: 'nextjs-image', label: 'Next.js' },
     { value: 'bg-div', label: 'bg-div' },
+    { value: 'css', label: 'CSS' },
     { value: 'agent-instruction', label: 'Agent' },
   ]
 
@@ -15,9 +16,13 @@
   let copied = $state(false)
   let panelEl: HTMLDivElement | undefined = $state()
 
+  const modifiedFrames = $derived(
+    store.frames.filter(f => store.modifiedBreakpoints.has(f.breakpoint))
+  )
+
   const output = $derived(
     store.image
-      ? renderOutput(store.classString, store.outputFormat, store.image.filename)
+      ? renderOutput(store.classString, store.outputFormat, store.image.filename, modifiedFrames)
       : ''
   )
 
@@ -74,6 +79,11 @@
     await navigator.clipboard.writeText(output)
     copied = true
     setTimeout(() => { copied = false }, 1500)
+    window.posthog?.capture('output_copied', {
+      output_format: store.outputFormat,
+      class_string_length: store.classString.length,
+      modified_breakpoints_count: store.modifiedBreakpoints.size,
+    })
   }
 
   function handleClickOutside(e: MouseEvent) {
@@ -98,7 +108,13 @@
   $effect(() => {
     const ts = store.lastModifiedAt
     if (!ts) return
+    const breakpoint = store.lastModifiedBreakpoint
     const timer = setTimeout(() => {
+      window.posthog?.capture('frame_adjusted', {
+        breakpoint,
+        output_format: store.outputFormat,
+        modified_breakpoints_count: store.modifiedBreakpoints.size,
+      })
       store.clearLastModified()
     }, 2000)
     return () => clearTimeout(timer)
@@ -113,7 +129,11 @@
   class:cursor-pointer={!expanded}
   class:w-3xl={expanded}
   class:max-w-[calc(100%-2.5rem)]={expanded}
-  onclick={() => { expanded = !expanded }}
+  onclick={() => {
+    const next = !expanded
+    expanded = next
+    if (next) window.posthog?.capture('output_panel_expanded', { output_format: store.outputFormat })
+  }}
 >
   {#if !expanded}
     <div class="flex items-center gap-4 px-4 py-2.5">
@@ -140,7 +160,7 @@
               {store.outputFormat === fmt.value
                 ? 'text-studio-text'
                 : 'text-studio-muted/40 hover:text-studio-muted'}"
-            onclick={(e) => { e.stopPropagation(); store.setOutputFormat(fmt.value) }}
+            onclick={(e) => { e.stopPropagation(); store.setOutputFormat(fmt.value); window.posthog?.capture('output_format_changed', { output_format: fmt.value }) }}
           >
             {fmt.label}
           </button>
