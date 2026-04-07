@@ -100,10 +100,10 @@
   <div class="grain-overlay absolute inset-0 opacity-15 mix-blend-overlay pointer-events-none"></div>
 
   <div class="relative z-10 max-w-6xl mx-auto px-3 sm:px-6 py-6 lg:py-8">
-    <div class="relative" style:min-height={smallScreen.current ? undefined : '390px'}>
+    <div class="relative grid">
     {#key activeIndex}
       <div
-        class="{smallScreen.current ? '' : 'absolute inset-x-0 top-0'} will-change-[opacity,transform,filter]"
+        class="[grid-area:1/1] will-change-[opacity,transform,filter]"
         in:emerge
         out:recede
       >
