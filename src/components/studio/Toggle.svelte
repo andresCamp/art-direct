@@ -27,7 +27,7 @@
 
 <button
   type="button"
-  class="cursor-pointer relative flex items-center gap-1.5 {size === 'md' ? 'text-sm' : 'text-[11px]'} font-mono before:absolute before:-inset-6 before:content-['']"
+  class="cursor-pointer relative flex items-center gap-1.5 {size === 'md' ? 'text-sm' : 'text-[11px]'} font-mono before:absolute before:-inset-4 before:content-['']"
   onclick={onToggle}
 >
   <!-- Sliding indicator -->

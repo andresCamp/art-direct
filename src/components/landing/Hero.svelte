@@ -14,8 +14,8 @@
     Art Direct lets you drag, zoom, and recompose a single image per breakpoint, then copy a Tailwind class string.
   </p>
 
-  <p class="mt-3 text-sm text-ink-muted leading-relaxed max-w-lg anim-rise" style="animation-delay: 160ms">
-    No extra assets. No image CDN. No <code class="text-[13px] font-mono text-ink-muted/80 bg-ink/5 px-1 py-0.5 rounded">&lt;picture&gt;</code> markup.
+  <p class="mt-3 text-sm text-ink-secondary leading-relaxed max-w-lg anim-rise" style="animation-delay: 160ms">
+    No extra assets. No image CDN. No <code class="text-[13px] font-mono text-ink/70 bg-ink/5 px-1 py-0.5 rounded">&lt;picture&gt;</code> markup.
     Just CSS, authored visually.
   </p>
 
@@ -23,7 +23,7 @@
     href="https://github.com/andresCamp/art-direct"
     target="_blank"
     rel="noopener noreferrer"
-    class="inline-flex items-center gap-1.5 mt-6 text-xs font-mono tracking-wide text-ink-muted/60 hover:text-ink-secondary transition-colors duration-200 anim-rise"
+    class="inline-flex items-center gap-1.5 mt-6 text-xs font-mono tracking-wide text-ink-secondary hover:text-ink transition-colors duration-200 anim-rise"
     style="animation-delay: 200ms"
   >
     <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">

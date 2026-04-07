@@ -49,7 +49,7 @@
         Drop an image here
       {/if}
     </p>
-    <p class="text-xs text-ink-muted">
+    <p class="text-xs text-ink-secondary">
       or click to browse
     </p>
   </button>

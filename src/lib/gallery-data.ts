@@ -11,7 +11,7 @@ export interface GalleryItem {
 export const galleryItems: GalleryItem[] = [
   {
     id: 'napoleon',
-    image: '/gallery/napoleon.jpg',
+    image: '/gallery/napoleon.webp',
     label: 'Napoleon Crossing the Alps, David',
     gradient: ['#4a3a2a', '#8a7a6a'],
     frames: [
@@ -25,7 +25,7 @@ export const galleryItems: GalleryItem[] = [
   },
   {
     id: 'wave',
-    image: '/gallery/wave.jpg',
+    image: '/gallery/wave.webp',
     label: 'The Great Wave off Kanagawa, Hokusai',
     gradient: ['#1a3a5c', '#c8b88a'],
     frames: [
@@ -39,7 +39,7 @@ export const galleryItems: GalleryItem[] = [
   },
   {
     id: 'adam',
-    image: '/gallery/adam.jpg',
+    image: '/gallery/adam.webp',
     label: 'The Creation of Adam, Michelangelo',
     gradient: ['#8a7a60', '#c4b8a0'],
     frames: [
@@ -53,7 +53,7 @@ export const galleryItems: GalleryItem[] = [
   },
   {
     id: 'crows',
-    image: '/gallery/crows.jpg',
+    image: '/gallery/crows.webp',
     label: 'Wheatfield with Crows, Van Gogh',
     gradient: ['#2a3a5c', '#c4a830'],
     frames: [
@@ -67,7 +67,7 @@ export const galleryItems: GalleryItem[] = [
   },
   {
     id: 'whaam',
-    image: '/gallery/whaam.png',
+    image: '/gallery/whaam.webp',
     label: 'Whaam!, Roy Lichtenstein',
     gradient: ['#7a8aa0', '#cc2222'],
     frames: [

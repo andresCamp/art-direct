@@ -109,8 +109,9 @@
       >
         <!-- Before/after label + progress -->
         <div class="flex flex-col items-center gap-2 mb-4">
-          <span class="text-xs font-mono tracking-widest uppercase transition-all duration-700 {showDirected ? 'text-white/70' : 'text-white/40'}">
-            {showDirected ? 'with art direct' : 'without art direct'}
+          <span class="relative text-xs font-mono tracking-widest uppercase">
+            <span class="transition-opacity duration-700 text-white/40 {showDirected ? 'opacity-0' : 'opacity-100'}">without art direct</span>
+            <span class="absolute inset-0 transition-opacity duration-700 text-white/70 {showDirected ? 'opacity-100' : 'opacity-0'}">with art direct</span>
           </span>
           <div class="w-16 h-px bg-white/10 rounded-full overflow-hidden">
             <div class="h-full bg-white/40 rounded-full gallery-progress"></div>
@@ -165,11 +166,14 @@
 
 <style>
   .gallery-progress {
+    transform-origin: left;
     animation: progress-fill 8s linear forwards;
+    width: 100%;
+    will-change: transform;
   }
 
   @keyframes progress-fill {
-    from { width: 0%; }
-    to { width: 100%; }
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
   }
 </style>
