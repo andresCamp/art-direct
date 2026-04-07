@@ -15,6 +15,7 @@ Read osis/twin.md and the active specs in osis/ before working on any product fe
 - **Static site, no backend.** Everything runs client-side. No accounts, no persistence, no image uploads to a server. Images are blob URLs.
 - **Framework:** Astro with Svelte 5 islands. Tailwind CSS v4 via `@tailwindcss/vite`.
 - **Output is Tailwind class strings.** The tool maps visual manipulations (drag, zoom, pan) to Tailwind utilities scoped per breakpoint. Zero runtime in the consumer's app.
+- **Package manager:** Use `bun` for all commands (`bun run build`, `bun install`, etc.). Do not use `npm`.
 
 ## Design Direction
 

@@ -1,13 +1,14 @@
 <script lang="ts">
   import { handleFiles } from '../../lib/upload'
 
-  interface Props {
-    pageDragging?: boolean
-  }
-
-  let { pageDragging = false }: Props = $props()
-
+  let pageDragging = $state(false)
   let fileInput: HTMLInputElement
+
+  $effect(() => {
+    const handler = (e: Event) => { pageDragging = (e as CustomEvent).detail }
+    document.addEventListener('page-drag', handler)
+    return () => document.removeEventListener('page-drag', handler)
+  })
 
   function onClick() {
     fileInput.click()

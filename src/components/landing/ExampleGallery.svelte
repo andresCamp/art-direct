@@ -136,6 +136,7 @@
                       src={activeItem.image}
                       alt={activeItem.label}
                       draggable="false"
+                      fetchpriority={bpName === 'base' ? 'high' : undefined}
                       class="w-full h-full pointer-events-none ease-out {mounted ? 'transition-all duration-2000' : ''}"
                       style:object-fit={frame.objectFit}
                       style:object-position={showDirected ? frame.objectPosition : 'center'}
