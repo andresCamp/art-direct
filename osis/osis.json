@@ -3,15 +3,21 @@
   "type": "product",
   "product": "art-direct",
   "productVersion": "v1",
-  "activePhase": null,
-  "lastTwinUpdate": "2026-04-06",
+  "activePhase": "phase-2-activation",
+  "lastTwinUpdate": "2026-04-08",
   "lastDriftScan": null,
   "files": {
     "twin": "osis/twin.md",
     "v1": {
       "vision": "osis/v1/vision.md",
       "product-spec": "osis/v1/product-spec.md",
-      "changelog": "osis/v1/changelog.md"
+      "changelog": "osis/v1/changelog.md",
+      "phase-2-activation": {
+        "game-plan": "osis/v1/phase-2-activation/game-plan.md",
+        "image-sidebar--product-spec": "osis/v1/phase-2-activation/image-sidebar--product-spec.md",
+        "welcome-experience--product-spec": "osis/v1/phase-2-activation/welcome-experience--product-spec.md",
+        "persistence--product-spec": "osis/v1/phase-2-activation/persistence--product-spec.md"
+      }
     }
   }
 }

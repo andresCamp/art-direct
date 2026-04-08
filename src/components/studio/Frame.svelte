@@ -1,8 +1,11 @@
 <script lang="ts">
   import { store } from '../../lib/store.svelte'
   import { DISPLAY_WIDTHS } from '../../lib/breakpoints'
+  import { handleFilesForActiveDirection, handleClipboardPasteForActiveDirection } from '../../lib/upload'
   import type { BreakpointDef, FrameState, ObjectFit } from '../../lib/types'
   import FitToggle from './FitToggle.svelte'
+
+  let fileInput: HTMLInputElement | undefined = $state()
 
   interface Props {
     frame: FrameState
@@ -18,14 +21,38 @@
   let { frame, breakpointDef, isActive, isModified, onActivate, deviceWidth, deviceHeight, widthOverride }: Props = $props()
 
   // --- Drag state ---
+  // Translate gestures (pointer drag, wheel pan) feel too fast at 1:1; scale them
+  // down so the marching-ants border reads as a calmer companion to the cursor.
+  // Zoom/scale gestures stay 1:1 — they already produce smaller magnitudes.
+  const TRANSLATE_MARCH_SCALE = 0.25
   let isDragging = $state(false)
   let dragStart = $state({ x: 0, y: 0 })
   let dragOrigin = $state({ x: 0, y: 0 })
   let dragOriginPos = $state({ x: 50, y: 50 })
+  let lastDragPos = $state({ x: 0, y: 0 })
 
   // --- Touch pinch-to-zoom state ---
   let isPinching = $state(false)
   let touchOrigin = $state({ dist: 0, scale: 1, tx: 0, ty: 0 })
+  let lastTouchDist = 0
+
+  // --- Wheel debounce (no native begin/end events, so we synthesize them) ---
+  let wheelEndTimer: ReturnType<typeof setTimeout> | undefined
+  let wheelActive = false
+
+  function pulseWheelDrag() {
+    if (!wheelActive) {
+      wheelActive = true
+      store.beginDrag()
+    }
+    clearTimeout(wheelEndTimer)
+    wheelEndTimer = setTimeout(() => {
+      wheelActive = false
+      store.endDrag()
+    }, 150)
+  }
+
+  $effect(() => () => clearTimeout(wheelEndTimer))
 
   function getTouchInfo(t1: Touch, t2: Touch) {
     return {
@@ -37,28 +64,47 @@
 
   function onTouchStart(e: TouchEvent) {
     if (!isActive || e.touches.length < 2) return
+    // If a pointer drag was already in flight, end it cleanly before pivoting to pinch.
+    if (isDragging && didDrag) store.endDrag()
     isPinching = true
     isDragging = false
     const info = getTouchInfo(e.touches[0], e.touches[1])
+    lastTouchDist = info.dist
+    store.beginDrag()
+    if (isCover) {
+      const converted = getContainEquivalentState()
+      touchOrigin = { dist: info.dist, scale: converted.scale, tx: converted.translateX, ty: converted.translateY }
+      return
+    }
     touchOrigin = { dist: info.dist, scale: frame.scale, tx: frame.translateX, ty: frame.translateY }
   }
 
   function onTouchMove(e: TouchEvent) {
     if (!isPinching || e.touches.length < 2) return
+    const info = getTouchInfo(e.touches[0], e.touches[1])
+    // Pinch distance delta drives the marching-ants border (expand = CW, contract = CCW).
+    store.addDragDelta(info.dist - lastTouchDist, 0)
+    lastTouchDist = info.dist
     if (isCover) {
-      store.updateFrame(frame.breakpoint, { objectFit: 'contain', objectPosition: 'center' })
-      isPinching = false
+      const converted = getContainEquivalentState()
+      const ratio = info.dist / touchOrigin.dist
+      store.updateFrame(frame.breakpoint, {
+        ...converted,
+        scale: clampScale(converted.scale * ratio),
+      })
       return
     }
-    const info = getTouchInfo(e.touches[0], e.touches[1])
     const ratio = info.dist / touchOrigin.dist
-    const newScale = Math.round(Math.max(0.1, Math.min(10, touchOrigin.scale * ratio)) * 100) / 100
+    const newScale = clampScale(touchOrigin.scale * ratio)
     store.updateFrame(frame.breakpoint, { scale: newScale })
   }
 
   function onTouchEnd(e: TouchEvent) {
     if (!isPinching) return
-    if (e.touches.length < 2) isPinching = false
+    if (e.touches.length < 2) {
+      isPinching = false
+      store.endDrag()
+    }
   }
 
   // --- Ghost image visibility (hover-based) ---
@@ -81,6 +127,7 @@
   })
 
   const isCover = $derived(frame.objectFit === 'cover')
+  const showGhostOverflow = $derived(store.viewMode === 'device' && showOverflow)
 
   // --- Object position helpers ---
   function parseObjPos(pos: string): { x: number, y: number } {
@@ -113,9 +160,51 @@
     return `${x}% ${y}%`
   }
 
+  function roundScale(value: number) {
+    return Math.round(value * 100) / 100
+  }
+
+  function roundTranslate(value: number) {
+    return Math.round(value * 10) / 10
+  }
+
+  function clampScale(value: number) {
+    return roundScale(Math.max(0.1, Math.min(10, value)))
+  }
+
+  function getContainEquivalentState() {
+    const W = displayWidth
+    const H = frameH
+    const imgAspect = store.image
+      ? store.image.naturalWidth / store.image.naturalHeight
+      : W / H
+    const frameAspect = W / H
+    const containBase = imgAspect > frameAspect
+      ? { w: W, h: W / imgAspect }
+      : { w: H * imgAspect, h: H }
+    const coverWidth = imgBounds.right - imgBounds.left
+    const coverHeight = imgBounds.bottom - imgBounds.top
+    const scale = containBase.w > 0 ? coverWidth / containBase.w : 1
+    const renderedWidth = containBase.w * scale
+    const renderedHeight = containBase.h * scale
+    const txPx = imgBounds.left - (W - renderedWidth) / 2
+    const tyPx = imgBounds.top - (H - renderedHeight) / 2
+    const unitScale = Math.max(scaleRatio * 4, 0.001)
+
+    return {
+      objectFit: 'contain' as const,
+      objectPosition: 'center',
+      transformOrigin: 'center',
+      scale: clampScale(scale),
+      translateX: roundTranslate(txPx / unitScale),
+      translateY: roundTranslate(tyPx / unitScale),
+    }
+  }
+
   // --- Scale handles ---
   let isScaling = $state(false)
   let scaleOrigin = $state({ dist: 0, scale: 1, cx: 0, cy: 0 })
+  let lastScaleDist = 0
   let frameEl: HTMLElement | undefined = $state()
 
   function onScaleDown(e: PointerEvent) {
@@ -125,25 +214,28 @@
     const rect = frameEl!.getBoundingClientRect()
     const cx = rect.left + rect.width / 2
     const cy = rect.top + rect.height / 2
-    scaleOrigin = {
-      dist: Math.hypot(e.clientX - cx, e.clientY - cy),
-      scale: frame.scale,
-      cx, cy
-    }
+    const dist = Math.hypot(e.clientX - cx, e.clientY - cy)
+    scaleOrigin = { dist, scale: frame.scale, cx, cy }
+    lastScaleDist = dist
+    store.beginDrag()
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
 
   function onScaleMove(e: PointerEvent) {
     if (!isScaling) return
     const dist = Math.hypot(e.clientX - scaleOrigin.cx, e.clientY - scaleOrigin.cy)
+    // Radial-distance delta drives the marching-ants border (out = CW, in = CCW).
+    store.addDragDelta(dist - lastScaleDist, 0)
+    lastScaleDist = dist
     const ratio = dist / scaleOrigin.dist
-    const newScale = Math.round(Math.max(0.1, Math.min(10, scaleOrigin.scale * ratio)) * 100) / 100
+    const newScale = clampScale(scaleOrigin.scale * ratio)
     store.updateFrame(frame.breakpoint, { scale: newScale })
   }
 
   function onScaleUp() {
     if (!isScaling) return
     isScaling = false
+    store.endDrag()
   }
 
   // --- Display dimensions ---
@@ -222,6 +314,10 @@
   let didDrag = $state(false)
 
   function onPointerDown(e: PointerEvent) {
+    if (!store.image) {
+      e.stopPropagation()
+      return
+    }
     if (!isActive) {
       onActivate()
       return
@@ -244,9 +340,21 @@
     if (!didDrag) {
       const dx = Math.abs(e.clientX - dragStart.x)
       const dy = Math.abs(e.clientY - dragStart.y)
-      if (dx + dy > 3) didDrag = true
-      else return
+      if (dx + dy > 3) {
+        didDrag = true
+        // Reset baseline so the marching-ants border starts smooth on its first frame.
+        lastDragPos = { x: e.clientX, y: e.clientY }
+        store.beginDrag()
+      } else return
     }
+
+    // Push raw screen-space delta to the global drag tracker (drives the
+    // OutputPanel marching-ants border — speed = cursor velocity, sign = dominant axis).
+    const rawDx = e.clientX - lastDragPos.x
+    const rawDy = e.clientY - lastDragPos.y
+    if (rawDx || rawDy) store.addDragDelta(rawDx * TRANSLATE_MARCH_SCALE, rawDy * TRANSLATE_MARCH_SCALE)
+    lastDragPos = { x: e.clientX, y: e.clientY }
+
     if (isCover) {
       const dx = e.clientX - dragStart.x
       const dy = e.clientY - dragStart.y
@@ -272,6 +380,7 @@
       store.setActiveBreakpoint('' as any)
       return
     }
+    store.endDrag()
     if (!isCover) {
       store.updateFrame(frame.breakpoint, {
         translateX: Math.round(frame.translateX),
@@ -284,24 +393,48 @@
     if (!isActive) return
     e.preventDefault()
 
+    // Marching-ants tracker — wheel has no native begin/end, so debounce them.
+    // Pan: photo-direction = negated wheel delta. Zoom: in = positive (CW), out = negative.
+    pulseWheelDrag()
+    if (e.ctrlKey || e.metaKey) {
+      store.addDragDelta(-e.deltaY, 0)
+    } else {
+      store.addDragDelta(-e.deltaX * TRANSLATE_MARCH_SCALE, -e.deltaY * TRANSLATE_MARCH_SCALE)
+    }
+
     if (isCover) {
-      // Switch to contain on any zoom/pan gesture
-      store.updateFrame(frame.breakpoint, { objectFit: 'contain', objectPosition: 'center' })
+      const converted = getContainEquivalentState()
+      if (e.ctrlKey || e.metaKey) {
+        const delta = e.deltaY > 0 ? -0.03 : 0.03
+        store.updateFrame(frame.breakpoint, {
+          ...converted,
+          scale: clampScale(converted.scale + delta),
+        })
+        return
+      }
+
+      const dx = -e.deltaX / scaleRatio / 4
+      const dy = -e.deltaY / scaleRatio / 4
+      store.updateFrame(frame.breakpoint, {
+        ...converted,
+        translateX: roundTranslate(converted.translateX + dx),
+        translateY: roundTranslate(converted.translateY + dy),
+      })
       return
     }
 
     if (e.ctrlKey || e.metaKey) {
       // Pinch-to-zoom
       const delta = e.deltaY > 0 ? -0.03 : 0.03
-      const newScale = Math.round(Math.max(0.1, Math.min(10, frame.scale + delta)) * 100) / 100
+      const newScale = clampScale(frame.scale + delta)
       store.updateFrame(frame.breakpoint, { scale: newScale })
     } else {
       // Two-finger pan
       {
         const dx = -e.deltaX / scaleRatio / 4
         const dy = -e.deltaY / scaleRatio / 4
-        const unitX = Math.round((frame.translateX + dx) * 10) / 10
-        const unitY = Math.round((frame.translateY + dy) * 10) / 10
+        const unitX = roundTranslate(frame.translateX + dx)
+        const unitY = roundTranslate(frame.translateY + dy)
         store.updateFrame(frame.breakpoint, { translateX: unitX, translateY: unitY })
       }
     }
@@ -328,6 +461,7 @@
     {isActive ? 'z-10' : ''}"
   style:width="{displayWidth}px"
   style:touch-action={isActive ? 'none' : undefined}
+  class:cursor-pointer={!isActive && !!store.image}
   class:cursor-grab={isActive && !isDragging && !isScaling}
   class:cursor-grabbing={isDragging}
   role="application"
@@ -355,7 +489,7 @@
       {#if isModified}
         <button
           type="button"
-          class="text-[9px] font-mono {isActive ? 'text-art-300/50' : 'text-studio-muted/30'} hover:text-red-400/70 transition-colors"
+          class="cursor-pointer text-[9px] font-mono {isActive ? 'text-art-300/50' : 'text-studio-muted/30'} hover:text-red-400/70 transition-colors"
           onclick={resetFrame}
           onpointerdown={(e) => e.stopPropagation()}
           title="Reset frame"
@@ -371,6 +505,38 @@
 
   <!-- Image area -->
   <div class="relative">
+    {#if !store.image}
+      <!-- Empty state — drop target -->
+      <div
+        bind:this={frameEl}
+        class="rounded-lg border-2 border-dashed border-studio-border/40 transition-all duration-300 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-art-400/40 hover:bg-art-400/5"
+        style:height={displayHeight ? `${displayHeight}px` : undefined}
+        style:aspect-ratio={displayHeight ? undefined : '16/9'}
+        role="button"
+        tabindex="0"
+        onclick={() => fileInput?.click()}
+        ondragover={(e) => e.preventDefault()}
+        ondrop={(e) => { e.preventDefault(); e.stopPropagation(); handleFilesForActiveDirection(e.dataTransfer?.files ?? null) }}
+        onkeydown={(e) => { if (e.key === 'Enter') fileInput?.click() }}
+      >
+        <svg class="w-6 h-6 text-studio-muted/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+        </svg>
+        <span class="text-[10px] text-studio-muted/50 text-center px-2">Drop or browse</span>
+        <button
+          type="button"
+          class="cursor-pointer text-[10px] text-art-400/60 hover:text-art-400 transition-colors"
+          onclick={(e) => { e.stopPropagation(); handleClipboardPasteForActiveDirection() }}
+        >Paste</button>
+        <input
+          bind:this={fileInput}
+          type="file"
+          accept="image/*"
+          class="hidden"
+          onchange={(e) => handleFilesForActiveDirection(e.currentTarget.files)}
+        />
+      </div>
+    {:else}
     <!-- The composition boundary -->
     <div
       bind:this={frameEl}
@@ -386,7 +552,7 @@
       <!-- Ghost image — overflow visible, shown on hover -->
       <div
         class="absolute inset-0 overflow-visible transition-opacity duration-500"
-        style:opacity={showOverflow ? 0.3 : 0}
+        style:opacity={showGhostOverflow ? 0.3 : 0}
         style:pointer-events="none"
       >
         {#if store.image}
@@ -471,5 +637,6 @@
         <span class="text-[10px] font-mono {isActive ? 'text-art-300/70' : isModified ? 'text-art-300/50' : 'text-studio-muted/20'}">{frame.scale.toFixed(1)}x</span>
       {/if}
     </div>
+    {/if}
   </div>
 </div>

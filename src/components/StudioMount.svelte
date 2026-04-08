@@ -4,9 +4,29 @@
   let showStudio = $state(false)
   let transitioning = $state(false)
   let Studio: any = $state(null)
+  let initialLoad = true
 
   $effect(() => {
     if (store.image && !showStudio && !transitioning) {
+      // If image is available on first render (gallery pre-loaded), skip the transition
+      if (initialLoad) {
+        initialLoad = false
+        const landing = document.getElementById('landing')
+        if (landing) landing.classList.add('hidden')
+        ;(async () => {
+          const mod = await import('./studio/Studio.svelte')
+          Studio = mod.default
+          showStudio = true
+          window.posthog?.capture('studio_entered', {
+            filename: store.image?.filename,
+            image_width: store.image?.naturalWidth,
+            image_height: store.image?.naturalHeight,
+          })
+        })()
+        return
+      }
+
+      // Animated transition for subsequent uploads
       transitioning = true
       const landing = document.getElementById('landing')
       if (landing) {

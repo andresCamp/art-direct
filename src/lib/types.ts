@@ -27,3 +27,17 @@ export interface ImageState {
 }
 
 export type OutputFormat = 'img' | 'nextjs-image' | 'bg-div' | 'css' | 'agent-instruction'
+export type DirectionKind = 'example' | 'upload' | 'blank'
+
+export interface Direction {
+  id: string
+  name: string
+  image: ImageState | null
+  frames: FrameState[]
+  dominantColor: string | null
+  modifiedBreakpoints: Set<BreakpointName>
+  lastModifiedBreakpoint: BreakpointName | null
+  lastModifiedAt: number
+  kind: DirectionKind
+  exampleId?: string
+}

@@ -40,9 +40,13 @@ The gap between the analog and what we're building: no tool today lets you visua
 
 ## 3. The Pipeline
 
+### 3.0 Entry
+
+User arrives at artdirect.dev and lands directly in the studio. A randomly selected example image (Wave, Adam, Napoleon, or Crows) is pre-loaded with configured frames and a visible class string. On first visit, a welcome modal auto-plays a brief animated walkthrough (3-4 steps, ~10 seconds, dismissable). The user can start dragging immediately.
+
 ### 3.1 Upload
 
-User drops or selects an image file. The image is read client-side as a blob URL. No upload to any server. The landing page transitions to studio mode.
+Upload moves from the landing page to the image sidebar — a left-edge panel accessible from the top bar. The sidebar holds gallery examples (click to switch), an upload drop zone (drag-drop + file picker), and a "New" button that creates blank frames as drop targets. The image is read client-side as a blob URL. No upload to any server.
 
 ### 3.2 Compose
 
@@ -92,6 +96,8 @@ Nothing persists to disk or server in v1. The product is stateless -- the class 
 | Studio UI | Application | Yes | Render frames, handle gestures, generate classes |
 | Class Generator | Engine | No | Map frame states to minimal Tailwind class string |
 | Format Renderer | Engine | No | Adapt class string to output format (img, Next.js, bg, agent) |
+| Image Sidebar | Navigation | Yes | Switch between gallery examples, upload new images, manage directions |
+| Welcome Modal | Onboarding | Yes | First-time context: what Art Direct is and how to use it |
 
 ### What Flows Between Them
 
@@ -103,8 +109,9 @@ Developer uploads image -> Studio UI renders it in frames -> Developer manipulat
 
 ### Primary Loop: Compose and Copy
 
-**Trigger:** Developer has an image that looks bad on mobile.
-**Action:** Upload, drag/zoom in breakpoint frames.
+**Trigger:** Developer arrives at artdirect.dev and sees a pre-composed example image ready to manipulate.
+**First Contact:** Studio loads with example. Welcome modal provides 10-second context (first visit only). User starts dragging.
+**Action:** Drag/zoom in breakpoint frames, switch examples, or upload own image.
 **Reward:** A class string that makes the image look intentional everywhere.
 **Investment:** Zero -- no account, no config, no persistence needed.
 **Next Trigger:** Next image, next project.
@@ -125,9 +132,10 @@ Each successful use reinforces the mental model that responsive image compositio
 
 | Screen | Stage | Key Elements |
 |--------|-------|--------------|
-| Landing | Entry | Light blue theme, dotted upload box, title, GitHub link, description, scroll-to-example |
-| Example | Entry (below fold) | Rotating gallery of 5 iconic images (The Great Wave, Rousseau's jungle, Dalí's clocks, etc.) rendered in breakpoint frames, pre-composed, demonstrating the concept |
-| Studio | Compose | Breakpoint frames with image, drag/zoom handles, fit toggles, real-time class output |
+| Studio (/) | Entry + Compose | Pre-loaded example image, breakpoint frames, drag/zoom, real-time class output. Welcome modal on first visit. |
+| /about | Reference | Current landing page content — hero, value prop, example gallery. Linked for SEO and sharing. |
+| Image Sidebar | Navigation | Left-edge panel — gallery examples, upload zone, new direction button |
+| Welcome Modal | First Visit | 3-4 step animated walkthrough, auto-advances, dismissable, re-openable via "?" |
 | Output Panel | Copy | Format pills (img, Next.js, bg-div, agent), class string display, copy button, filename comment |
 | Breakpoint Settings | Configure | Customize active breakpoints and widths, reset to Tailwind defaults |
 
@@ -141,7 +149,9 @@ Each successful use reinforces the mental model that responsive image compositio
 
 **Dashed borders for frames.** Frames are not device mockups. They're compositional containers. Dashed borders communicate "this is a boundary you're working within" without pretending to be a phone or laptop.
 
-**No modals, no onboarding, no tooltips.** The interface should be self-evident. Upload triggers studio. Drag does what drag looks like. The example below the fold is the onboarding.
+**Studio-first.** The studio is the product. Users land in the studio, not on a landing page. An example image is pre-loaded so the first interaction is manipulation, not upload. The landing page pitch lives at /about for reference and SEO. The welcome modal handles first-time context — brief, animated, non-blocking.
+
+**Modals only for first contact.** The welcome modal is the one exception to minimal chrome — it exists because users arrive directly into the studio without landing page context. After first visit, the studio is self-evident.
 
 **The class string is always visible.** It updates live. It's not hidden behind a "generate" button. The developer sees the output changing as they manipulate.
 
@@ -173,17 +183,32 @@ Each successful use reinforces the mental model that responsive image compositio
 
 **Success looks like:** A developer can go from image upload to copied class string in under 60 seconds. The tool is usable without documentation.
 
-### Phase 2 — Polish and Ecosystem
+### Phase 2 — Activation Pivot (April 2026)
 
-**Goal:** Refinements based on real usage, plus ecosystem integrations.
+**Goal:** Remove the upload barrier. Make the studio the first thing users experience.
+
+**Signal:** 10 screen recordings from Reddit launch — zero users uploaded an image. The tool needs to show its value before asking for investment.
+
+| Component | Tier | Notes |
+|-----------|------|-------|
+| Studio as homepage with pre-loaded example | T1 | Random selection from gallery, configured frames |
+| Welcome modal (animated first-time walkthrough) | T1 | Auto-advances, clickable, dismissable, re-openable |
+| Left sidebar (image management) | T1 | Gallery examples, upload, new direction |
+| Landing content moves to /about | T1 | SEO and sharing preserved |
+
+**Does not ship:** Persistence (ships immediately after), shareable URLs, custom breakpoints.
+
+**Success looks like:** Users interact with frames within 10 seconds of landing. Upload rate improves from Reddit baseline. Ready for HN/X launch.
+
+### Phase 2.5 — Persistence (April 2026)
+
+**Goal:** Images and directions persist across sessions via Dexie.js (IndexedDB).
 
 | Component | Notes |
 |-----------|-------|
-| Shareable URLs (encode state in hash) | Share compositions without a backend |
-| Config file export (tailwind.config mapping) | Map class strings to semantic names |
-| Preset library (common compositions) | Starting points for portrait, landscape, hero |
-| VS Code extension | Preview art direction inline |
-| CLI tool | Generate classes from a config file |
+| Dexie.js integration | Store images and frame states in IndexedDB |
+| Sidebar shows persisted directions | Recent images available across sessions |
+| Welcome modal flag moves to Dexie | Consistent with persistence layer |
 
 ### Phase 3 — Beyond Images
 

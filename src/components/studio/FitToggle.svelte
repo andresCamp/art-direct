@@ -21,7 +21,7 @@
 
 <button
   type="button"
-  class="text-[10px] font-mono tracking-wide {isActive ? 'text-art-300/70' : 'text-studio-muted/50'} hover:text-studio-text/70 bg-studio-bg/60 backdrop-blur-sm px-2.5 py-1.5 sm:px-1.5 sm:py-0.5 rounded transition-colors duration-200"
+  class="cursor-pointer text-[10px] font-mono tracking-wide {isActive ? 'text-art-300/70' : 'text-studio-muted/50'} hover:text-studio-text/70 bg-studio-bg/60 backdrop-blur-sm px-2.5 py-1.5 sm:px-1.5 sm:py-0.5 rounded transition-colors duration-200"
   onclick={cycle}
   onpointerdown={(e) => e.stopPropagation()}
 >

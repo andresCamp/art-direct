@@ -1,0 +1,19 @@
+---
+import Layout from '../layouts/Layout.astro'
+import WelcomeModal from '../components/WelcomeModal.svelte'
+---
+
+<Layout title="Welcome Modal — Test">
+  <main class="min-h-[100dvh] bg-studio-bg text-studio-text relative">
+    <!-- Subtle context so the modal doesn't float in pure black -->
+    <div class="absolute inset-0 grain-overlay opacity-[0.04] mix-blend-overlay pointer-events-none"></div>
+
+    <div class="relative z-10 flex items-center justify-center min-h-[100dvh]">
+      <p class="font-mono text-xs text-studio-muted/60 tracking-wider uppercase">
+        /modal — isolation test (no persistence)
+      </p>
+    </div>
+
+    <WelcomeModal client:load testMode />
+  </main>
+</Layout>

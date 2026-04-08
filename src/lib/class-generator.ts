@@ -18,7 +18,6 @@ const STANDARD_SCALES: Record<number, string> = {
 // Tailwind v4 supports all integer values as translate utilities (e.g., translate-y-30)
 // so we just need to check if the value is a clean integer
 
-
 function scaleClass(value: number): string {
   if (value === 1) return ''
   const standard = STANDARD_SCALES[value]
@@ -30,7 +29,6 @@ function translateClass(axis: 'x' | 'y', value: number): string {
   if (value === 0) return ''
   const abs = Math.abs(value)
   const neg = value < 0 ? '-' : ''
-  // Tailwind v4 supports any integer as a translate value
   if (Number.isInteger(abs)) {
     return `${neg}translate-${axis}-${abs}`
   }

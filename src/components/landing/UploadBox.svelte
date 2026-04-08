@@ -1,8 +1,22 @@
 <script lang="ts">
   import { handleFiles } from '../../lib/upload'
 
+  interface Props {
+    mode?: 'upload' | 'link'
+    href?: string
+    title?: string
+    subtitle?: string
+  }
+
+  let {
+    mode = 'upload',
+    href = '/',
+    title = 'Drop an image here',
+    subtitle = 'or click to browse',
+  }: Props = $props()
+
   let pageDragging = $state(false)
-  let fileInput: HTMLInputElement
+  let fileInput: HTMLInputElement | undefined = $state()
 
   $effect(() => {
     const handler = (e: Event) => { pageDragging = (e as CustomEvent).detail }
@@ -11,7 +25,11 @@
   })
 
   function onClick() {
-    fileInput.click()
+    if (mode === 'link') {
+      window.location.href = href
+      return
+    }
+    fileInput?.click()
   }
 
   function onFileChange(e: Event) {
@@ -38,20 +56,26 @@
     />
 
     <div class="text-art-400 mb-4 transition-transform duration-300 group-hover:-translate-y-1">
-      <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13" />
-      </svg>
+      {#if mode === 'link'}
+        <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5l6 6m0 0l-6 6m6-6h-15" />
+        </svg>
+      {:else}
+        <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13" />
+        </svg>
+      {/if}
     </div>
 
     <p class="text-sm font-medium text-ink-secondary mb-1">
       {#if pageDragging}
         Drop to start
       {:else}
-        Drop an image here
+        {title}
       {/if}
     </p>
     <p class="text-xs text-ink-secondary">
-      or click to browse
+      {subtitle}
     </p>
   </button>
 </div>

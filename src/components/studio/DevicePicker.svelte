@@ -25,7 +25,7 @@
   <div class="relative">
     <button
       type="button"
-      class="text-[11px] font-medium text-studio-muted hover:text-studio-text transition-colors duration-200 flex items-center gap-1 py-2 sm:py-0"
+      class="cursor-pointer text-[11px] font-medium text-studio-muted hover:text-studio-text transition-colors duration-200 flex items-center gap-1 py-2 sm:py-0"
       onclick={() => { open = !open }}
       onpointerdown={(e) => e.stopPropagation()}
     >
@@ -47,7 +47,7 @@
         {#each devices as device}
           <button
             type="button"
-            class="w-full text-left px-3 py-1.5 text-[11px] font-mono transition-colors duration-150
+            class="w-full cursor-pointer text-left px-3 py-1.5 text-[11px] font-mono transition-colors duration-150
               {device.id === deviceId
                 ? 'text-art-300 bg-art-500/10'
                 : 'text-studio-muted hover:text-studio-text hover:bg-studio-bg/50'}"
@@ -65,7 +65,7 @@
   <!-- Orientation toggle -->
   <button
     type="button"
-    class="text-studio-muted/40 hover:text-studio-muted transition-colors duration-200 p-2 sm:p-0"
+    class="cursor-pointer text-studio-muted/40 hover:text-studio-muted transition-colors duration-200 p-2 sm:p-0"
     onclick={() => store.toggleOrientation(category)}
     onpointerdown={(e) => e.stopPropagation()}
     aria-label="Toggle orientation"
