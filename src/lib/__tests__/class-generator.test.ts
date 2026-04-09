@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateClassString } from '../class-generator'
+import { buildClassTokens, generateClassString } from '../class-generator'
 import type { FrameState } from '../types'
 
 function frame(breakpoint: string, overrides: Partial<FrameState> = {}): FrameState {
@@ -107,5 +107,52 @@ describe('generateClassString', () => {
     expect(result).toContain('md:scale-100')
     expect(result).toContain('md:object-cover')
     expect(result).toContain('md:object-right')
+  })
+
+  it('resets a larger default frame after a changed smaller breakpoint', () => {
+    const result = generateClassString([
+      frame('base'),
+      frame('sm'),
+      frame('md', { translateY: 30 }),
+      frame('lg'),
+      frame('xl'),
+      frame('2xl'),
+    ])
+
+    expect(result).toBe('object-cover md:translate-y-30 lg:translate-y-0')
+  })
+
+  it('emits reset tokens for larger default frames after a changed base frame', () => {
+    const result = generateClassString([
+      frame('base', { scale: 2, objectFit: 'contain' }),
+      frame('sm'),
+      frame('md'),
+      frame('lg'),
+      frame('xl'),
+      frame('2xl'),
+    ])
+
+    expect(result).toContain('object-contain')
+    expect(result).toContain('scale-200')
+    expect(result).toContain('sm:scale-100')
+    expect(result).toContain('sm:object-cover')
+  })
+
+  it('builds stable semantic slot keys for emitted tokens', () => {
+    const tokens = buildClassTokens([
+      frame('base', { translateX: -10 }),
+      frame('md', { translateX: 25 }),
+    ])
+
+    expect(tokens.map(token => token.slotKey)).toEqual([
+      'base:translateX',
+      'base:objectFit',
+      'md:translateX',
+    ])
+    expect(tokens.map(token => token.text)).toEqual([
+      '-translate-x-10',
+      'object-cover',
+      'md:translate-x-25',
+    ])
   })
 })

@@ -6,8 +6,25 @@ import type { BreakpointName, Direction, DirectionKind, FrameState, ImageState, 
 
 export type ViewMode = 'device' | 'tailwind'
 export type Orientation = 'portrait' | 'landscape'
+export type StudioTab = 'compose' | 'preview'
 
-const CURATED_EXAMPLE_IDS = ['napoleon', 'wave', 'adam'] as const
+/**
+ * Bulk state replacement payload from the persistence layer.
+ * Built by persistence.ts hydrateStore() and applied via store.hydrate().
+ */
+export interface HydrationPayload {
+  directions: Direction[]
+  activeDirectionId: string | null
+  outputFormat: OutputFormat
+  viewMode: ViewMode
+  selectedDevices: Record<DeviceCategory, string>
+  orientations: Record<DeviceCategory, Orientation>
+  studioTab: StudioTab
+  sidebarOpen: boolean
+  welcomeSeen: boolean
+}
+
+export const CURATED_EXAMPLE_IDS = ['napoleon', 'wave', 'adam'] as const
 const PRELOADED_EXAMPLE_ID = CURATED_EXAMPLE_IDS[0]
 const curatedExamples = galleryItems.filter(item => CURATED_EXAMPLE_IDS.includes(item.id as typeof CURATED_EXAMPLE_IDS[number]))
 
@@ -86,6 +103,7 @@ function createStore() {
   let activeBreakpoint = $state<BreakpointName>('' as BreakpointName)
   let outputFormat = $state<OutputFormat>('agent-instruction')
   let viewMode = $state<ViewMode>('device')
+  let studioTab = $state<StudioTab>('compose')
   let selectedDevices = $state<Record<DeviceCategory, string>>({ ...DEFAULT_DEVICES })
   let orientations = $state<Record<DeviceCategory, Orientation>>({
     phone: 'portrait',
@@ -99,6 +117,11 @@ function createStore() {
   let isDragging = $state(false)
   let dragOffset = $state(0)
 
+  // --- Welcome flag (persisted to Dexie; see persistence.ts) ---
+  // Migrated from localStorage['artdirect-welcome-seen']. The reactive
+  // persistence watcher catches mutations to this field.
+  let welcomeSeen = $state(false)
+
   // --- Active direction derived ---
   const activeDirection = $derived(directions.find(d => d.id === activeDirectionId) ?? null)
 
@@ -111,9 +134,9 @@ function createStore() {
   const lastModifiedAt = $derived(activeDirection?.lastModifiedAt ?? 0)
 
   // --- Derived values (unchanged logic, now read from delegating getters) ---
-  const classString = $derived(generateClassString(
-    frames.filter(f => modifiedBreakpoints.has(f.breakpoint))
-  ))
+  const classString = $derived(
+    modifiedBreakpoints.size > 0 ? generateClassString(frames) : ''
+  )
 
   const activeFrame = $derived(frames.find(f => f.breakpoint === activeBreakpoint) ?? null)
 
@@ -165,6 +188,7 @@ function createStore() {
     get classString() { return classString },
     get activeFrame() { return activeFrame },
     get viewMode() { return viewMode },
+    get studioTab() { return studioTab },
     get selectedDevices() { return selectedDevices },
     get activeDevices() { return activeDevices },
     get orientations() { return orientations },
@@ -173,6 +197,7 @@ function createStore() {
     get lastModifiedAt() { return lastModifiedAt },
     get isDragging() { return isDragging },
     get dragOffset() { return dragOffset },
+    get welcomeSeen() { return welcomeSeen },
 
     // --- New multi-direction getters ---
     get directions() { return directions },
@@ -237,6 +262,10 @@ function createStore() {
       viewMode = mode
     },
 
+    setStudioTab(tab: StudioTab) {
+      studioTab = tab
+    },
+
     setDevice(category: DeviceCategory, deviceId: string) {
       selectedDevices = { ...selectedDevices, [category]: deviceId }
     },
@@ -266,9 +295,11 @@ function createStore() {
       activeBreakpoint = '' as BreakpointName
       outputFormat = 'agent-instruction'
       viewMode = 'device'
+      studioTab = 'compose'
       selectedDevices = { ...DEFAULT_DEVICES }
       orientations = { phone: 'portrait', tablet: 'landscape', desktop: 'landscape' }
       sidebarOpen = false
+      welcomeSeen = false
     },
 
     // --- New multi-direction methods ---
@@ -326,16 +357,6 @@ function createStore() {
       activeBreakpoint = '' as BreakpointName
     },
 
-    loadExampleDirection(id: string) {
-      const example = getCuratedExample(id)
-      if (!example) return
-
-      const direction = createDirectionFromGallery(example)
-      directions = [direction, ...directions.filter(item => item.kind !== 'example')]
-      activeDirectionId = direction.id
-      activeBreakpoint = '' as BreakpointName
-    },
-
     toggleSidebar() {
       sidebarOpen = !sidebarOpen
     },
@@ -364,6 +385,49 @@ function createStore() {
       const mag = Math.hypot(dx, dy)
       const sign = dx + dy >= 0 ? 1 : -1
       dragOffset += sign * mag
+    },
+
+    // --- Persistence integration ---
+
+    /**
+     * Bulk-replace state from the persistence layer. Called once on mount after
+     * Dexie hydration. Svelte 5 runes batch the resulting render to one tick.
+     *
+     * Hybrid swap rule: when payload.activeDirectionId equals the current
+     * activeDirectionId, the active direction's image element keeps its URL
+     * (examples are static `/gallery/<id>.webp` URLs that don't change between
+     * the seeded direction and the hydrated one), so the LCP `<img>` does not
+     * unmount and the swap is invisible. Frame state may differ if the user
+     * modified it in a prior session — that re-renders without disturbing the
+     * image element.
+     */
+    hydrate(payload: HydrationPayload) {
+      directions = payload.directions
+      activeDirectionId = payload.activeDirectionId
+      outputFormat = payload.outputFormat
+      viewMode = payload.viewMode
+      studioTab = payload.studioTab
+      sidebarOpen = payload.sidebarOpen
+      selectedDevices = { ...payload.selectedDevices }
+      orientations = { ...payload.orientations }
+      welcomeSeen = payload.welcomeSeen
+      activeBreakpoint = '' as BreakpointName
+    },
+
+    setWelcomeSeen(seen: boolean) {
+      welcomeSeen = seen
+    },
+
+    /**
+     * Apply a partial patch to a single direction by id. Used by the persistence
+     * layer for the lazy-blob-load path on uploaded directions: as each blob
+     * resolves from IndexedDB, this fills in the direction's `image` field.
+     * Generic enough to be reused for other targeted updates.
+     */
+    patchDirection(id: string, partial: Partial<Direction>) {
+      mutateDirection(id, d => {
+        Object.assign(d, partial)
+      })
     },
   }
 }

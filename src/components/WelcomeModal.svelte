@@ -1,8 +1,10 @@
 <script lang="ts">
   import { Tween } from 'svelte/motion'
   import { cubicInOut } from 'svelte/easing'
+  import { store } from '../lib/store.svelte'
+  import { persistPreferencesNow } from '../lib/persistence.svelte'
 
-  // testMode: bypass localStorage entirely (always show on mount, don't persist on dismiss).
+  // testMode: bypass store/Dexie entirely (always show on mount, don't persist on dismiss).
   // Use on the /modal route so the modal can be tested in isolation.
   let { testMode = false }: { testMode?: boolean } = $props()
 
@@ -178,23 +180,25 @@
   })
 
   // ─── First-visit check ─────────────────────────────────────────────────────
+  // The store is the source of truth for `welcomeSeen`. On cold load it starts
+  // false; persistence.ts hydrateStore() reads the persisted value (and runs
+  // the localStorage-→-Dexie migration) before this effect's first read in the
+  // common path. To handle the race where this effect runs before hydration,
+  // we re-check on every store change and only show after we're confident the
+  // hydrated value is `false`.
   $effect(() => {
     if (testMode) {
-      // Always show in test mode, no localStorage interaction
+      // Always show in test mode, no store interaction
       const id = setTimeout(() => { show = true }, 100)
       return () => clearTimeout(id)
     }
-    let seen = false
-    try {
-      seen = localStorage.getItem('artdirect-welcome-seen') === '1'
-    } catch {
-      // private mode — show every time
-      seen = false
-    }
+    const seen = store.welcomeSeen
     hasSeenBefore = seen
     if (!seen) {
-      // small delay so the studio paints first
+      // small delay so the studio paints first AND any pending Dexie hydration
+      // has a chance to flip welcomeSeen to true before we show the modal
       const id = setTimeout(() => {
+        if (store.welcomeSeen) return
         show = true
         window.posthog?.capture('welcome_modal_shown', { trigger: 'first_visit' })
       }, 500)
@@ -509,9 +513,10 @@
     dismissedThisSession = true
     hasSeenBefore = true
     if (!testMode) {
-      try {
-        localStorage.setItem('artdirect-welcome-seen', '1')
-      } catch {}
+      store.setWelcomeSeen(true)
+      // Welcome flag is "immediate" — flush past the 500ms prefs debounce so
+      // a tab close right after dismissal still persists.
+      persistPreferencesNow().catch(err => console.warn('[welcome] persist failed:', err))
       window.posthog?.capture('welcome_modal_dismissed', {
         step_reached: step,
         method,

@@ -1,10 +1,13 @@
 <script lang="ts">
   import { store } from '../../lib/store.svelte'
   import { handlePasteEvent } from '../../lib/upload'
+  import { hydrateStore, startPersistence } from '../../lib/persistence.svelte'
   import { cubicOut } from 'svelte/easing'
   import EditView from './EditView.svelte'
   import OutputPanel from './OutputPanel.svelte'
   import Preview from './Preview.svelte'
+  import PreviewToolbar from './PreviewToolbar.svelte'
+  import SecondaryBar from './SecondaryBar.svelte'
   import Toggle from './Toggle.svelte'
   import Sidebar from './Sidebar.svelte'
 
@@ -30,8 +33,15 @@
       : 'px-5 pb-6 pt-20 md:px-6 md:pt-[5.5rem]'
   )
 
-  type Tab = 'compose' | 'preview'
-  let activeTab = $state<Tab>('compose')
+  // Compose / Preview tab is now persisted via store.studioTab so it
+  // survives a refresh. Read through the store; write via setStudioTab.
+  const activeTab = $derived(store.studioTab)
+
+  // Hidden until persistence hydration completes (or fails). Avoids the
+  // "Napoleon flashes then swaps to your last-active direction" effect on
+  // return visits — we render a skeleton during the brief Dexie open + read
+  // window instead.
+  let hydrated = $state(false)
 
   const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform || navigator.userAgent)
   const sidebarShortcutLabel = isMac ? '⌘B' : 'Ctrl B'
@@ -49,6 +59,23 @@
       css: (t: number) => `opacity: ${t}; transform: scale(${0.97 + 0.03 * t})`,
     }
   }
+
+  // Persistence: open Dexie, hydrate the store from IndexedDB, then wire up
+  // reactive write subscriptions. Failures degrade silently to ephemeral mode.
+  // Either path flips `hydrated` so the skeleton clears.
+  $effect(() => {
+    let cleanup: (() => void) | undefined
+    hydrateStore()
+      .then(() => {
+        cleanup = startPersistence()
+        hydrated = true
+      })
+      .catch(err => {
+        console.warn('[persistence] disabled:', err)
+        hydrated = true
+      })
+    return () => cleanup?.()
+  })
 
   // Global clipboard paste handler
   $effect(() => {
@@ -92,7 +119,7 @@
   })
 
   function focusBlankDirection() {
-    activeTab = 'compose'
+    store.setStudioTab('compose')
     store.setViewMode('device')
   }
 
@@ -119,6 +146,7 @@
     style:background="radial-gradient(ellipse at top left, {accent}, transparent 42%), radial-gradient(circle at 100% 0%, rgba(255,255,255,0.06), transparent 28%)"
   ></div>
 
+  {#if hydrated}
   <div class="hidden md:block">
     <div
       class="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
@@ -182,7 +210,7 @@
 
             <button
               type="button"
-              class="group relative hidden cursor-pointer items-center gap-1.5 px-0 py-0 font-mono text-[11px] uppercase tracking-[0.14em] text-studio-muted/54 transition-colors duration-200 before:absolute before:-inset-3 before:content-[''] hover:text-studio-text md:inline-flex"
+              class="group relative hidden cursor-pointer items-center gap-1.5 px-0 py-0 font-mono text-[11px] uppercase tracking-[0.14em] text-studio-muted/66 transition-colors duration-200 before:absolute before:-inset-3 before:content-[''] hover:text-studio-text md:inline-flex"
               onclick={handleNewDirection}
               aria-label="Create new direction"
             >
@@ -197,7 +225,7 @@
               active={activeTab === 'compose' ? 0 : 1}
               onToggle={() => {
                 const next = activeTab === 'compose' ? 'preview' : 'compose'
-                activeTab = next
+                store.setStudioTab(next)
                 window.posthog?.capture('studio_tab_switched', { tab: next })
               }}
               size="md"
@@ -223,20 +251,22 @@
           </div>
         </div>
 
-        <div class="pointer-events-none absolute inset-x-0 top-12 z-20 flex justify-center transition-all duration-300 ease-out md:top-14 {activeTab !== 'compose' ? 'pointer-events-none scale-95 opacity-0' : 'scale-100 opacity-100'}">
-          <div class="pointer-events-auto">
-            <Toggle
-              options={['Devices', 'Tailwind']}
-              active={store.viewMode === 'device' ? 0 : 1}
-              onToggle={() => {
-                const next = store.viewMode === 'device' ? 'tailwind' : 'device'
-                store.setViewMode(next)
-                window.posthog?.capture('view_mode_changed', { view_mode: next })
-              }}
-              showUnderline={false}
-            />
-          </div>
-        </div>
+        <SecondaryBar active={activeTab === 'compose'}>
+          <Toggle
+            options={['Devices', 'Tailwind']}
+            active={store.viewMode === 'device' ? 0 : 1}
+            onToggle={() => {
+              const next = store.viewMode === 'device' ? 'tailwind' : 'device'
+              store.setViewMode(next)
+              window.posthog?.capture('view_mode_changed', { view_mode: next })
+            }}
+            showUnderline={false}
+          />
+        </SecondaryBar>
+
+        <SecondaryBar active={activeTab === 'preview'}>
+          <PreviewToolbar />
+        </SecondaryBar>
 
         <div class={`relative z-10 flex flex-1 items-center overflow-hidden ${studioContentInsetClass}`}>
           {#key activeTab}
@@ -257,6 +287,37 @@
         <OutputPanel />
     </div>
   </div>
+  {:else}
+  <!-- Skeleton during Dexie hydration. Replaces the studio chrome to avoid the
+       "Napoleon flashes then swaps to your last-active direction" effect on
+       return visits. The outer container's bg + grain + gradient stay visible
+       underneath so the transition into the real chrome is seamless. -->
+  <div class="relative z-10 min-h-[100dvh] min-w-0">
+    <div class="relative flex min-h-[100dvh] min-w-0 flex-col overflow-hidden bg-studio-bg">
+      <div class="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center px-5 py-3 md:px-6 md:py-4">
+        <div class="flex items-center gap-2.5">
+          <div class="h-4 w-4 rounded-sm bg-white/[0.05] animate-pulse"></div>
+          <div class="h-3 w-20 rounded-sm bg-white/[0.05] animate-pulse"></div>
+        </div>
+        <div class="absolute left-1/2 -translate-x-1/2">
+          <div class="h-7 w-36 rounded-full bg-white/[0.05] animate-pulse"></div>
+        </div>
+      </div>
+
+      <div class="relative z-10 flex flex-1 items-center justify-center px-5 pb-24 pt-20 md:px-6 md:pb-28 md:pt-[5.5rem]">
+        <div class="flex items-end gap-4 md:gap-6">
+          <div class="h-40 w-24 rounded-2xl bg-white/[0.04] animate-pulse md:h-48 md:w-28"></div>
+          <div class="h-44 w-36 rounded-2xl bg-white/[0.05] animate-pulse md:h-52 md:w-44"></div>
+          <div class="h-40 w-48 rounded-2xl bg-white/[0.04] animate-pulse md:h-48 md:w-56"></div>
+        </div>
+      </div>
+
+      <div class="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center md:bottom-8">
+        <div class="h-10 w-72 rounded-full bg-white/[0.04] animate-pulse md:w-96"></div>
+      </div>
+    </div>
+  </div>
+  {/if}
 
   {#if store.sidebarOpen}
     <div

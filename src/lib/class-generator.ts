@@ -1,5 +1,5 @@
 import { BREAKPOINTS } from './breakpoints'
-import type { FrameState, ObjectFit } from './types'
+import type { BreakpointName, FrameState, ObjectFit } from './types'
 
 const STANDARD_SCALES: Record<number, string> = {
   0: '0',
@@ -14,9 +14,6 @@ const STANDARD_SCALES: Record<number, string> = {
   1.5: '150',
   2: '200',
 }
-
-// Tailwind v4 supports all integer values as translate utilities (e.g., translate-y-30)
-// so we just need to check if the value is a clean integer
 
 function scaleClass(value: number): string {
   if (value === 1) return ''
@@ -63,6 +60,33 @@ interface FrameClasses {
   transformOrigin: string
 }
 
+export type FrameClassField = keyof FrameClasses
+
+export interface ClassToken {
+  breakpoint: BreakpointName
+  field: FrameClassField
+  slotKey: `${BreakpointName}:${FrameClassField}`
+  text: string
+}
+
+const FRAME_CLASS_FIELDS: FrameClassField[] = [
+  'scale',
+  'translateX',
+  'translateY',
+  'objectFit',
+  'objectPosition',
+  'transformOrigin',
+]
+
+const RESET_CLASS: Record<FrameClassField, string> = {
+  scale: 'scale-100',
+  translateX: 'translate-x-0',
+  translateY: 'translate-y-0',
+  objectFit: 'object-cover',
+  objectPosition: 'object-center',
+  transformOrigin: 'origin-center',
+}
+
 function getFrameClasses(frame: FrameState): FrameClasses {
   return {
     scale: scaleClass(frame.scale),
@@ -74,8 +98,8 @@ function getFrameClasses(frame: FrameState): FrameClasses {
   }
 }
 
-export function generateClassString(frames: FrameState[]): string {
-  if (frames.length === 0) return ''
+export function buildClassTokens(frames: FrameState[]): ClassToken[] {
+  if (frames.length === 0) return []
 
   const sorted = [...frames].sort((a, b) => {
     const order = BREAKPOINTS.map(bp => bp.name)
@@ -84,51 +108,43 @@ export function generateClassString(frames: FrameState[]): string {
 
   const baseFrame = sorted[0]
   const baseClasses = getFrameClasses(baseFrame)
+  const tokens: ClassToken[] = []
 
-  const parts: string[] = []
-
-  // Emit base (unprefixed) classes
-  for (const cls of Object.values(baseClasses)) {
-    if (cls) parts.push(cls)
+  for (const field of FRAME_CLASS_FIELDS) {
+    const cls = baseClasses[field]
+    if (!cls) continue
+    tokens.push({
+      breakpoint: baseFrame.breakpoint,
+      field,
+      slotKey: `${baseFrame.breakpoint}:${field}`,
+      text: cls,
+    })
   }
 
-  // Track effective state (what's inherited from previous breakpoints)
   let effective = { ...baseClasses }
 
-  // Emit prefixed overrides for each subsequent breakpoint
   for (let i = 1; i < sorted.length; i++) {
     const frame = sorted[i]
-    const bp = BREAKPOINTS.find(b => b.name === frame.breakpoint)
+    const bp = BREAKPOINTS.find(candidate => candidate.name === frame.breakpoint)
     if (!bp) continue
 
     const current = getFrameClasses(frame)
-    const prefix = bp.prefix
-
-    // Explicit default classes needed when resetting a property at a breakpoint
-    const resetClass: Record<keyof FrameClasses, string> = {
-      scale: 'scale-100',
-      translateX: 'translate-x-0',
-      translateY: 'translate-y-0',
-      objectFit: 'object-cover',
-      objectPosition: 'object-center',
-      transformOrigin: 'origin-center',
+    for (const field of FRAME_CLASS_FIELDS) {
+      if (current[field] === effective[field]) continue
+      tokens.push({
+        breakpoint: frame.breakpoint,
+        field,
+        slotKey: `${frame.breakpoint}:${field}`,
+        text: `${bp.prefix}${current[field] || RESET_CLASS[field]}`,
+      })
     }
 
-    for (const key of Object.keys(current) as (keyof FrameClasses)[]) {
-      if (current[key] !== effective[key]) {
-        const cls = current[key]
-        if (cls) {
-          parts.push(`${prefix}${cls}`)
-        } else {
-          // Property was reset to default — emit explicit reset class
-          parts.push(`${prefix}${resetClass[key]}`)
-        }
-      }
-    }
-
-    // Update effective state
     effective = { ...effective, ...current }
   }
 
-  return parts.join(' ')
+  return tokens
+}
+
+export function generateClassString(frames: FrameState[]): string {
+  return buildClassTokens(frames).map(token => token.text).join(' ')
 }

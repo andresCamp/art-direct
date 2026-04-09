@@ -17,8 +17,12 @@
     window.posthog?.capture('new_direction_created', { source: 'sidebar' })
   }
 
+  function handleSidebarBrandClick() {
+    store.setSidebar(false)
+  }
+
   function handleExample(id: string) {
-    store.loadExampleDirection(id)
+    store.setActiveDirection(`example:${id}`)
     closeSidebarOnMobile()
     window.posthog?.capture('direction_switched', { source: 'examples', direction_id: `example:${id}` })
   }
@@ -63,6 +67,17 @@
 
 <aside class="relative h-full pl-5 pr-5 pb-4 pt-4 text-studio-text md:pr-[3.25rem]">
   <div class="relative flex h-full flex-col">
+    <div class="mb-3 hidden md:block">
+      <button
+        type="button"
+        class="group cursor-pointer px-3 py-2 text-left"
+        onclick={handleSidebarBrandClick}
+        aria-label="Collapse sidebar"
+      >
+        <p class="font-display text-[1.05rem] italic leading-none text-studio-text transition-opacity duration-200 group-hover:opacity-72">Art Direct</p>
+      </button>
+    </div>
+
     <div>
       <button
         type="button"

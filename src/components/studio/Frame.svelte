@@ -25,6 +25,10 @@
   // down so the marching-ants border reads as a calmer companion to the cursor.
   // Zoom/scale gestures stay 1:1 — they already produce smaller magnitudes.
   const TRANSLATE_MARCH_SCALE = 0.25
+  const SCALE_MARCH_SCALE = 0.35
+  const WHEEL_DRAG_IDLE_MS = 1400
+  const WHEEL_SCALE_SENSITIVITY = 0.0085
+  const WHEEL_SCALE_DELTA_CAP = 0.12
   let isDragging = $state(false)
   let dragStart = $state({ x: 0, y: 0 })
   let dragOrigin = $state({ x: 0, y: 0 })
@@ -35,6 +39,7 @@
   let isPinching = $state(false)
   let touchOrigin = $state({ dist: 0, scale: 1, tx: 0, ty: 0 })
   let lastTouchDist = 0
+  let wheelScaleRaw = $state<number | null>(null)
 
   // --- Wheel debounce (no native begin/end events, so we synthesize them) ---
   let wheelEndTimer: ReturnType<typeof setTimeout> | undefined
@@ -43,13 +48,16 @@
   function pulseWheelDrag() {
     if (!wheelActive) {
       wheelActive = true
+      wheelScaleRaw = null
       store.beginDrag()
     }
     clearTimeout(wheelEndTimer)
     wheelEndTimer = setTimeout(() => {
       wheelActive = false
+      wheelScaleRaw = null
+      store.updateFrame(frame.breakpoint, { scale: settleScale(frame.scale) })
       store.endDrag()
-    }, 150)
+    }, WHEEL_DRAG_IDLE_MS)
   }
 
   $effect(() => () => clearTimeout(wheelEndTimer))
@@ -83,7 +91,7 @@
     if (!isPinching || e.touches.length < 2) return
     const info = getTouchInfo(e.touches[0], e.touches[1])
     // Pinch distance delta drives the marching-ants border (expand = CW, contract = CCW).
-    store.addDragDelta(info.dist - lastTouchDist, 0)
+    store.addDragDelta((info.dist - lastTouchDist) * SCALE_MARCH_SCALE, 0)
     lastTouchDist = info.dist
     if (isCover) {
       const converted = getContainEquivalentState()
@@ -103,6 +111,7 @@
     if (!isPinching) return
     if (e.touches.length < 2) {
       isPinching = false
+      if (!isCover) store.updateFrame(frame.breakpoint, { scale: settleScale(frame.scale) })
       store.endDrag()
     }
   }
@@ -164,12 +173,20 @@
     return Math.round(value * 100) / 100
   }
 
-  function roundTranslate(value: number) {
+  function settleScale(value: number) {
     return Math.round(value * 10) / 10
   }
 
+  function roundTranslate(value: number) {
+    return Math.round(value)
+  }
+
+  function clampScaleRaw(value: number) {
+    return Math.max(0.1, Math.min(10, value))
+  }
+
   function clampScale(value: number) {
-    return roundScale(Math.max(0.1, Math.min(10, value)))
+    return roundScale(clampScaleRaw(value))
   }
 
   function getContainEquivalentState() {
@@ -225,9 +242,9 @@
     if (!isScaling) return
     const dist = Math.hypot(e.clientX - scaleOrigin.cx, e.clientY - scaleOrigin.cy)
     // Radial-distance delta drives the marching-ants border (out = CW, in = CCW).
-    store.addDragDelta(dist - lastScaleDist, 0)
+    store.addDragDelta((dist - lastScaleDist) * SCALE_MARCH_SCALE, 0)
     lastScaleDist = dist
-    const ratio = dist / scaleOrigin.dist
+    const ratio = scaleOrigin.dist > 0 ? dist / scaleOrigin.dist : 1
     const newScale = clampScale(scaleOrigin.scale * ratio)
     store.updateFrame(frame.breakpoint, { scale: newScale })
   }
@@ -235,6 +252,7 @@
   function onScaleUp() {
     if (!isScaling) return
     isScaling = false
+    store.updateFrame(frame.breakpoint, { scale: settleScale(frame.scale) })
     store.endDrag()
   }
 
@@ -366,8 +384,8 @@
     } else {
       const dx = (e.clientX - dragStart.x) / scaleRatio
       const dy = (e.clientY - dragStart.y) / scaleRatio
-      const unitX = Math.round((dragOrigin.x * 4 + dx) / 4 * 10) / 10
-      const unitY = Math.round((dragOrigin.y * 4 + dy) / 4 * 10) / 10
+      const unitX = roundTranslate((dragOrigin.x * 4 + dx) / 4)
+      const unitY = roundTranslate((dragOrigin.y * 4 + dy) / 4)
       store.updateFrame(frame.breakpoint, { translateX: unitX, translateY: unitY })
     }
   }
@@ -397,7 +415,7 @@
     // Pan: photo-direction = negated wheel delta. Zoom: in = positive (CW), out = negative.
     pulseWheelDrag()
     if (e.ctrlKey || e.metaKey) {
-      store.addDragDelta(-e.deltaY, 0)
+      store.addDragDelta(-e.deltaY * SCALE_MARCH_SCALE, 0)
     } else {
       store.addDragDelta(-e.deltaX * TRANSLATE_MARCH_SCALE, -e.deltaY * TRANSLATE_MARCH_SCALE)
     }
@@ -405,10 +423,13 @@
     if (isCover) {
       const converted = getContainEquivalentState()
       if (e.ctrlKey || e.metaKey) {
-        const delta = e.deltaY > 0 ? -0.03 : 0.03
+        const baseScale = wheelScaleRaw ?? converted.scale
+        const delta = Math.max(-WHEEL_SCALE_DELTA_CAP, Math.min(WHEEL_SCALE_DELTA_CAP, -e.deltaY * WHEEL_SCALE_SENSITIVITY))
+        const nextScaleRaw = clampScaleRaw(baseScale + delta)
+        wheelScaleRaw = nextScaleRaw
         store.updateFrame(frame.breakpoint, {
           ...converted,
-          scale: clampScale(converted.scale + delta),
+          scale: roundScale(nextScaleRaw),
         })
         return
       }
@@ -425,9 +446,11 @@
 
     if (e.ctrlKey || e.metaKey) {
       // Pinch-to-zoom
-      const delta = e.deltaY > 0 ? -0.03 : 0.03
-      const newScale = clampScale(frame.scale + delta)
-      store.updateFrame(frame.breakpoint, { scale: newScale })
+      const baseScale = wheelScaleRaw ?? frame.scale
+      const delta = Math.max(-WHEEL_SCALE_DELTA_CAP, Math.min(WHEEL_SCALE_DELTA_CAP, -e.deltaY * WHEEL_SCALE_SENSITIVITY))
+      const nextScaleRaw = clampScaleRaw(baseScale + delta)
+      wheelScaleRaw = nextScaleRaw
+      store.updateFrame(frame.breakpoint, { scale: roundScale(nextScaleRaw) })
     } else {
       // Two-finger pan
       {
