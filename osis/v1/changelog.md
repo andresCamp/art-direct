@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-04-09
+
+### Phase 3 — Devices: Game Plan and System Spec
+
+Created Phase 3 to address the "limited device list felt like a drawback" signal. Phase scope is a Chrome DevTools-parity device picker for the Preview tab, plus a single canonical device data module that both Preview and Compose read from.
+
+- Created `osis/v1/phase-3-devices/game-plan.md`
+- Created `osis/v1/phase-3-devices/device-picker--product-spec.md`
+- Updated `osis/v1/product-spec.md` — inserted Phase 3 — Devices in the roadmap, renumbered Beyond Images to Phase 4
+- Updated `osis/osis.json` — files manifest now includes phase-3-devices, activePhase unchanged (phase-2-activation is still closing out)
+
+### Decisions Locked
+
+- Phase 3 is Devices; Beyond Images becomes Phase 4
+- Device picker is Preview-only — Compose's Devices/Tailwind toggle is untouched
+- One canonical devices module, lifted verbatim from Chromium's emulated-devices list
+- Picker UX = strip of pinned devices + "More devices…" searchable picker
+- Pins are global (not per-direction), persisted via the Phase 2.5 persistence layer
+- Default pins on fresh install = the current 7 PREVIEW_PRESETS — no visible regression
+- Class-string output stays pure Tailwind (no arbitrary `min-[Wpx]:` breakpoints)
+- Device records carry id/name/category/width/height/breakpoint — no userAgent, no DPR
+- Chromium device list is a frozen snapshot in v1, not live-synced
+
 ## 2026-04-08
 
 ### Phase 2 Shipped — Activation Pivot

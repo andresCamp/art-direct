@@ -32,9 +32,12 @@
 
   // Class output area
   const CLASS_X = 8
-  const CLASS_Y = 234
+  const CLASS_Y = 246
   const CLASS_W = 444
   const CLASS_H = 48
+  const STEP2_BASE_W = 500
+  const STEP2_BASE_H = 396
+  const STEP2_TARGET_SCALE = 0.8
 
   // Copy button visual position (right side of class output)
   const COPY_BTN_W = 68
@@ -76,7 +79,6 @@
 
   // ─── Reactive state ─────────────────────────────────────────────────────────
   let show = $state(false)
-  let dialog: HTMLDialogElement | undefined = $state()
   let step = $state<0 | 1>(0)
   let running = $state(false)
   let copied = $state(false)
@@ -114,6 +116,13 @@
   })
   const demoShellWidth = $derived(Math.round(DEMO_W * demoScale))
   const demoShellHeight = $derived(Math.round(DEMO_H * demoScale))
+  const step2Scale = $derived.by(() => {
+    const horizontal = (viewportW - 24) / STEP2_BASE_W
+    const vertical = (viewportH - 24) / STEP2_BASE_H
+    return Math.min(STEP2_TARGET_SCALE, horizontal, vertical)
+  })
+  const step2PanelWidth = $derived(`${Math.round(STEP2_BASE_W * step2Scale)}px`)
+  const step2PanelHeight = $derived(`${Math.round(STEP2_BASE_H * step2Scale)}px`)
   const mobileVisualX = $derived(
     mobileDragging
       ? clampNumber(mobileDragBaseX + (cursorPosX - mobileDragAnchorX), MOBILE_MIN_X, MOBILE_MAX_X)
@@ -206,15 +215,25 @@
     }
   })
 
-  // ─── Sync dialog open/close with `show` state ──────────────────────────────
+  // ─── Start / stop the floating welcome loop with `show` state ─────────────
   $effect(() => {
-    if (!dialog) return
-    if (show && !dialog.open) {
-      dialog.showModal()
-      void playLoop()
-    } else if (!show && dialog.open) {
-      dialog.close()
+    if (!show) return
+    void playLoop()
+    return () => {
+      running = false
+      cursorMoveToken += 1
     }
+  })
+
+  $effect(() => {
+    if (!show) return
+
+    function onKeydown(event: KeyboardEvent) {
+      if (event.key === 'Escape') dismiss('escape')
+    }
+
+    window.addEventListener('keydown', onKeydown)
+    return () => window.removeEventListener('keydown', onKeydown)
   })
 
   // ─── Animation timeline ────────────────────────────────────────────────────
@@ -502,7 +521,7 @@
   }
 
   // ─── Dismiss handlers ──────────────────────────────────────────────────────
-  function dismiss(method: 'cta' | 'backdrop' | 'escape') {
+  function dismiss(method: 'close' | 'escape') {
     running = false
     activeClassFrame = 'none'
     mobileDragging = false
@@ -531,25 +550,35 @@
     show = true
     window.posthog?.capture('welcome_modal_shown', { trigger: 'reopen' })
   }
-
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === dialog) dismiss('backdrop')
-  }
-
-  function handleClose() {
-    // fired by the native dialog when Escape is pressed
-    if (show) dismiss('escape')
-  }
 </script>
 
 {#if show}
-  <dialog
-    bind:this={dialog}
-    onclose={handleClose}
-    onclick={handleBackdropClick}
-    class="welcome-dialog"
+  <div
+    class="welcome-layer"
+    aria-live="polite"
   >
-    <div class="modal-panel" class:is-step1={step === 0} class:is-step2={step === 1}>
+    <section
+      class="modal-panel"
+      class:is-step1={step === 0}
+      class:is-step2={step === 1}
+      style:--step-2-scale={String(step2Scale)}
+      style:--step-2-panel-width={step2PanelWidth}
+      style:--step-2-panel-height={step2PanelHeight}
+      role="dialog"
+      aria-modal="false"
+      aria-label="Welcome to Art Direct"
+    >
+      <button
+        type="button"
+        class="absolute right-3 top-3 z-[5] inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#111827]/5 text-[#111827]/58 transition-[background-color,color,transform] duration-150 hover:bg-[#111827]/9 hover:text-[#111827]/84 active:scale-[0.97] max-[560px]:right-2.5 max-[560px]:top-2.5 max-[560px]:h-[30px] max-[560px]:w-[30px]"
+        onclick={() => dismiss('close')}
+        aria-label="Close welcome"
+      >
+        <svg class="h-[14px] w-[14px]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+
       <!-- Step 1: title card -->
       <div class="step step-1" class:visible={step === 0}>
         <div class="step-1-content">
@@ -564,175 +593,177 @@
 
       <!-- Step 2: demo -->
       <div class="step step-2" class:visible={step === 1}>
-        <div class="step-2-layout">
-          <div class="step-2-header">
-            <div class="step-2-logo font-display italic">Art Direct</div>
-            <p class="step-2-caption">Move the crop. Copy the classes.</p>
-          </div>
-
-          <!-- Demo canvas: fixed coordinate system for everything below -->
-          <div
-            class="demo-shell"
-            style:width={`${demoShellWidth}px`}
-            style:height={`${demoShellHeight}px`}
-          >
-            <div
-              class="demo-canvas"
-              style:width="{DEMO_W}px"
-              style:height="{DEMO_H}px"
-              style:transform={`scale(${demoScale})`}
-            >
-            <!-- Mobile frame -->
-            <div
-              class="frame"
-              style:left="{MOBILE_X}px"
-              style:top="{MOBILE_Y}px"
-              style:width="{MOBILE_W}px"
-              style:height="{MOBILE_H}px"
-            >
-              <span class="frame-label">Mobile</span>
-              <div class="frame-inner">
-                <div
-                  class="mobile-image-stack"
-                  class:dragging={mobileDragging}
-                  style:width={`${MOBILE_IMAGE_W}px`}
-                  style:height={`${MOBILE_IMAGE_H}px`}
-                  style:transform={`translate3d(${mobileVisualX}px, 0, 0)`}
-                >
-                  <img
-                    class="frame-image mobile-image"
-                    src="/gallery/napoleon.webp"
-                    alt=""
-                    draggable="false"
-                  />
-                </div>
+        <div
+          class="step-2-stage"
+          style:width={`${STEP2_BASE_W}px`}
+          style:height={`${STEP2_BASE_H}px`}
+        >
+          <div class="step-2-layout box-border grid h-full w-full grid-rows-[auto_minmax(0,1fr)] items-start justify-items-center gap-4 p-5 max-[560px]:gap-3 max-[560px]:p-4">
+            <div class="step-2-header flex min-h-9 w-full items-center pr-11 max-[560px]:pr-10">
+              <div class="flex w-full items-center justify-between gap-4">
+                <div class="step-2-logo shrink-0 font-display text-[26px] italic leading-none tracking-[-0.01em] text-[#111827] max-[560px]:text-[23px]">Art Direct</div>
+                <p class="step-2-caption whitespace-nowrap text-right font-sans text-[14px] leading-none tracking-[-0.01em] text-[#6b7280] max-[560px]:whitespace-normal max-[560px]:text-[13px]">
+                  Move the crop. Copy the classes.
+                </p>
               </div>
             </div>
 
-            <!-- Desktop frame -->
+            <!-- Demo canvas: fixed coordinate system for everything below -->
             <div
-              class="frame"
-              style:left="{DESKTOP_X}px"
-              style:top="{DESKTOP_Y}px"
-              style:width="{DESKTOP_W}px"
-              style:height="{DESKTOP_H}px"
+              class="demo-shell"
+              style:width={`${demoShellWidth}px`}
+              style:height={`${demoShellHeight}px`}
             >
-              <span class="frame-label">Desktop</span>
-              <div class="frame-inner">
-                <div
-                  class="desktop-image-stack"
-                  class:dragging={desktopDragging}
-                  style:width={`${DESKTOP_IMAGE_W}px`}
-                  style:height={`${DESKTOP_IMAGE_H}px`}
-                  style:transform={`translate3d(0, ${desktopVisualY}px, 0) scale(${desktopVisualScale})`}
-                >
-                  <img
-                    class="frame-image desktop-image"
-                    src="/gallery/napoleon.webp"
-                    alt=""
-                    draggable="false"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- Class output: stable rows with live values matching the active drag -->
-            <div
-              class="class-output"
-              style:left="{CLASS_X}px"
-              style:top="{CLASS_Y}px"
-              style:width="{CLASS_W}px"
-              style:height="{CLASS_H}px"
-            >
-              <div class="class-flow">
-                {#each classTokens as token}
-                  <span
-                    class="cls"
-                    class:value={token.value}
-                    class:active={activeClassFrame === token.frame}
-                    class:inactive={activeClassFrame !== 'none' && activeClassFrame !== token.frame}
+              <div
+                class="demo-canvas"
+                style:width="{DEMO_W}px"
+                style:height="{DEMO_H}px"
+                style:transform={`scale(${demoScale})`}
+              >
+              <!-- Mobile frame -->
+              <div
+                class="frame"
+                style:left="{MOBILE_X}px"
+                style:top="{MOBILE_Y}px"
+                style:width="{MOBILE_W}px"
+                style:height="{MOBILE_H}px"
+              >
+                <span class="frame-label">Mobile</span>
+                <div class="frame-inner">
+                  <div
+                    class="mobile-image-stack"
+                    class:dragging={mobileDragging}
+                    style:width={`${MOBILE_IMAGE_W}px`}
+                    style:height={`${MOBILE_IMAGE_H}px`}
+                    style:transform={`translate3d(${mobileVisualX}px, 0, 0)`}
                   >
-                    {token.text}
-                  </span>
-                {/each}
+                    <img
+                      class="frame-image mobile-image"
+                      src="/gallery/napoleon.webp"
+                      alt=""
+                      draggable="false"
+                    />
+                  </div>
+                </div>
               </div>
-              <div class="copy-btn" class:copied aria-hidden="true">
-                {#if copied}
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  Copied
+
+              <!-- Desktop frame -->
+              <div
+                class="frame"
+                style:left="{DESKTOP_X}px"
+                style:top="{DESKTOP_Y}px"
+                style:width="{DESKTOP_W}px"
+                style:height="{DESKTOP_H}px"
+              >
+                <span class="frame-label">Desktop</span>
+                <div class="frame-inner">
+                  <div
+                    class="desktop-image-stack"
+                    class:dragging={desktopDragging}
+                    style:width={`${DESKTOP_IMAGE_W}px`}
+                    style:height={`${DESKTOP_IMAGE_H}px`}
+                    style:transform={`translate3d(0, ${desktopVisualY}px, 0) scale(${desktopVisualScale})`}
+                  >
+                    <img
+                      class="frame-image desktop-image"
+                      src="/gallery/napoleon.webp"
+                      alt=""
+                      draggable="false"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Class output: stable rows with live values matching the active drag -->
+              <div
+                class="class-output"
+                style:left="{CLASS_X}px"
+                style:top="{CLASS_Y}px"
+                style:width="{CLASS_W}px"
+                style:height="{CLASS_H}px"
+              >
+                <div class="class-flow">
+                  {#each classTokens as token}
+                    <span
+                      class="cls"
+                      class:value={token.value}
+                      class:active={activeClassFrame === token.frame}
+                      class:inactive={activeClassFrame !== 'none' && activeClassFrame !== token.frame}
+                    >
+                      {token.text}
+                    </span>
+                  {/each}
+                </div>
+                <div class="copy-btn" class:copied aria-hidden="true">
+                  {#if copied}
+                    Copied
+                  {:else}
+                    Copy
+                  {/if}
+                </div>
+              </div>
+
+              <!-- Cursor — sibling of frames and class output, can travel anywhere in canvas -->
+            <div
+              class="cursor"
+              style:transform={`translate3d(${cursorPosX}px, ${cursorPosY}px, 0) rotate(${cursorAngle}deg)`}
+              style:opacity={cursorOpacity.current}
+            >
+              <div
+                class="cursor-glyph"
+                class:pressed={cursorPressed && !cursorCopyHover}
+                class:copy-hover={cursorCopyHover}
+                class:copy-pressed={cursorCopyHover && cursorPressed}
+              >
+                {#if cursorCopyHover}
+                  <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+                    <path
+                      fill-rule="evenodd"
+                      clip-rule="evenodd"
+                      d="M6.99667 16.6967C6.66321 16.3018 6.25814 15.494 5.53722 14.5136C5.12861 13.9591 4.11533 12.9149 3.81357 12.3845C3.55173 11.9158 3.57992 11.7056 3.64214 11.3172C3.75252 10.6262 4.50866 10.0881 5.3153 10.1608C5.92469 10.2147 6.44131 10.5921 6.90626 10.9486C7.18688 11.1632 7.53209 11.5802 7.7399 11.8157C7.93129 12.0313 7.97826 12.1205 8.18256 12.3757C8.45261 12.7135 8.53715 12.8808 8.43383 12.5089C8.35046 11.9631 8.21426 11.0311 8.01701 10.207C7.86672 9.58199 7.83031 9.48406 7.68707 9.00431C7.5356 8.49376 7.45812 8.13615 7.31604 7.59479C7.21741 7.21187 7.04012 6.42955 6.99198 5.98941C6.92505 5.38753 6.88982 4.40603 7.30195 3.95489C7.62485 3.60169 8.36573 3.49496 8.82481 3.71283C9.42597 3.99781 9.76765 4.81646 9.92382 5.14325C10.2044 5.73083 10.3782 6.40973 10.5297 7.30101C10.7222 8.43544 11.0768 10.01 11.0886 10.3412C11.16 10.824 11.0087 9.08024 11.0839 8.69072C11.152 8.33751 11.469 7.92709 11.8658 7.81595C12.2016 7.72243 12.595 7.68832 12.9414 7.75544C13.3088 7.82587 13.6963 8.07233 13.8408 8.30451C14.2658 8.99112 14.274 10.394 14.2916 10.3192C14.3926 9.90549 14.375 8.96691 14.6251 8.57629C14.7895 8.31881 15.2087 8.08664 15.4318 8.04923C15.7769 7.99201 16.2008 7.9744 16.5636 8.04043C16.8559 8.09434 17.2517 8.42003 17.3585 8.57629C17.6144 8.9548 17.76 10.0254 17.8034 10.4006C17.8211 10.5558 17.8903 9.96931 18.1475 9.59079C18.6242 8.88769 20.3114 8.75124 20.376 10.2939C20.4054 11.0135 20.3995 10.9805 20.3995 11.4647C20.3995 12.0335 20.3855 12.3757 20.3526 12.7872C20.3161 13.2274 20.2152 14.222 20.0684 14.7041C20.0023 14.9208 19.8362 15.3146 19.6368 15.6862C19.4365 16.0595 19.1574 16.3814 18.8863 16.7071C18.5057 17.1643 17.9896 17.8381 17.9045 18.2218C17.7659 18.8401 17.8117 18.8446 17.7847 19.2836C17.7658 19.59 17.8429 19.9643 17.8909 20.1614C17.9084 20.2334 17.8602 20.3059 17.7865 20.3134C17.505 20.3417 16.8649 20.3946 16.4779 20.3366C16.0188 20.2673 15.4505 19.4112 15.3037 19.1494C15.1018 18.7884 14.6708 18.8578 14.503 19.124C14.2388 19.5455 13.6705 20.3014 13.269 20.3488C12.514 20.4377 10.9776 20.3869 9.72746 20.3723C9.65243 20.3714 9.59565 20.3027 9.60515 20.2283C9.64502 19.9157 9.69386 19.1741 9.31679 18.8765C8.95867 18.5915 8.34224 18.0138 7.97357 17.7101L6.99667 16.6967Z"
+                      fill="#ffffff"
+                      stroke="#111111"
+                      stroke-width="0.96"
+                    />
+                    <path d="M16.68 17.04V13.32" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
+                    <path d="M14.52 17.04V13.32" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
+                    <path d="M11.88 13.32V17.04" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
+                  </svg>
+                {:else if cursorPressed}
+                  <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+                    <path
+                      fill-rule="evenodd"
+                      clip-rule="evenodd"
+                      d="M7.68 6.33655C8.24671 6.11869 9.36478 6.25209 9.65994 6.9155C9.91142 7.48097 10.8361 9.39161 10.8479 9.18843C10.8762 8.73679 10.8195 7.76005 11.0096 7.24964C11.1478 6.87755 11.4193 6.52749 11.8195 6.40388C12.156 6.29861 12.5515 6.26189 12.901 6.33656C13.2706 6.41488 13.659 6.68783 13.8042 6.94732C14.2316 7.70986 14.2387 9.27166 14.2588 9.18843C14.3344 8.8555 14.3414 7.68416 14.5928 7.24964C14.7594 6.96201 15.1796 6.70497 15.404 6.66335C15.7511 6.59971 16.1785 6.58012 16.5421 6.65356C16.8361 6.71354 17.234 7.07462 17.3414 7.24964C17.6 7.67069 17.7452 8.8604 17.7889 9.27901C17.8078 9.45159 17.8763 8.79797 18.1348 8.37815C18.6142 7.59603 20.3119 7.44425 20.3756 9.16028C20.4064 9.96076 20.3993 9.92404 20.3993 10.4626C20.3993 11.0942 20.3851 11.4761 20.3521 11.9338C20.3166 12.4222 20.2151 13.5299 20.0675 14.066C19.966 14.4344 19.6295 15.263 19.2966 15.76C19.2966 15.76 18.0286 17.29 17.8904 17.9778C17.7523 18.667 17.7983 18.6719 17.77 19.159C17.7504 19.5113 17.8334 19.9432 17.8812 20.1565C17.8969 20.227 17.85 20.2969 17.7782 20.305C17.4988 20.3362 16.849 20.3962 16.456 20.3303C15.9943 20.2544 15.4229 19.3022 15.2753 19.0109C15.0722 18.6095 14.6389 18.6865 14.4701 18.9827C14.2056 19.4515 13.633 20.2924 13.2304 20.345C12.4693 20.444 10.9224 20.3863 9.66472 20.3711C9.59057 20.3701 9.5341 20.3034 9.54294 20.2298C9.58328 19.8941 9.64139 19.0446 9.25519 18.7073C8.8951 18.3892 8.27525 17.7478 7.90453 17.41L6.92224 16.2827C6.58811 15.842 5.73923 15.1456 5.4547 13.853C5.20321 12.7074 5.228 12.1456 5.49838 11.6866C5.77229 11.2202 6.2894 10.9657 6.50665 10.9216C6.75222 10.8702 7.32365 10.8739 7.53971 10.9975C7.803 11.148 7.90925 11.1921 8.11586 11.4761C8.38741 11.8518 8.48423 12.0342 8.36734 11.6242C8.27761 11.3035 7.98718 10.8959 7.85494 10.4369C7.72625 9.99503 6.67291 8.32552 6.6977 7.61194C6.70715 7.34144 6.81931 6.66825 7.68 6.33655Z"
+                      fill="#ffffff"
+                      stroke="#111111"
+                      stroke-width="0.96"
+                    />
+                    <path d="M16.7797 16.5684V12.6287" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
+                    <path d="M14.3306 16.5684V12.6287" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
+                    <path d="M11.9882 12.6287V16.5684" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
+                  </svg>
                 {:else}
-                  Copy
+                  <svg viewBox="0 0 396 433" width="27" height="30" aria-hidden="true">
+                    <path
+                      d="M39.9744 31.8759C38.2182 23.4825 47.2034 16.9545 54.6432 21.2183L351.11 191.127C358.653 195.45 357.401 206.692 349.09 209.248L205.199 253.511C202.971 254.196 201.054 255.643 199.785 257.599L127.77 368.534C122.94 375.973 111.523 373.84 109.707 365.158L39.9744 31.8759Z"
+                      fill="#333333"
+                    />
+                    <path
+                      d="M346.169 199.749L202.277 244.012C197.821 245.383 193.988 248.277 191.449 252.188L119.434 363.121L49.7012 29.8407L346.169 199.749Z"
+                      stroke="#ffffff"
+                      stroke-width="19.8759"
+                    />
+                  </svg>
                 {/if}
               </div>
             </div>
-
-            <!-- Cursor — sibling of frames and class output, can travel anywhere in canvas -->
-          <div
-            class="cursor"
-            style:transform={`translate3d(${cursorPosX}px, ${cursorPosY}px, 0) rotate(${cursorAngle}deg)`}
-            style:opacity={cursorOpacity.current}
-          >
-            <div
-              class="cursor-glyph"
-              class:pressed={cursorPressed && !cursorCopyHover}
-              class:copy-hover={cursorCopyHover}
-              class:copy-pressed={cursorCopyHover && cursorPressed}
-            >
-              {#if cursorCopyHover}
-                <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
-                  <path
-                    fill-rule="evenodd"
-                    clip-rule="evenodd"
-                    d="M6.99667 16.6967C6.66321 16.3018 6.25814 15.494 5.53722 14.5136C5.12861 13.9591 4.11533 12.9149 3.81357 12.3845C3.55173 11.9158 3.57992 11.7056 3.64214 11.3172C3.75252 10.6262 4.50866 10.0881 5.3153 10.1608C5.92469 10.2147 6.44131 10.5921 6.90626 10.9486C7.18688 11.1632 7.53209 11.5802 7.7399 11.8157C7.93129 12.0313 7.97826 12.1205 8.18256 12.3757C8.45261 12.7135 8.53715 12.8808 8.43383 12.5089C8.35046 11.9631 8.21426 11.0311 8.01701 10.207C7.86672 9.58199 7.83031 9.48406 7.68707 9.00431C7.5356 8.49376 7.45812 8.13615 7.31604 7.59479C7.21741 7.21187 7.04012 6.42955 6.99198 5.98941C6.92505 5.38753 6.88982 4.40603 7.30195 3.95489C7.62485 3.60169 8.36573 3.49496 8.82481 3.71283C9.42597 3.99781 9.76765 4.81646 9.92382 5.14325C10.2044 5.73083 10.3782 6.40973 10.5297 7.30101C10.7222 8.43544 11.0768 10.01 11.0886 10.3412C11.16 10.824 11.0087 9.08024 11.0839 8.69072C11.152 8.33751 11.469 7.92709 11.8658 7.81595C12.2016 7.72243 12.595 7.68832 12.9414 7.75544C13.3088 7.82587 13.6963 8.07233 13.8408 8.30451C14.2658 8.99112 14.274 10.394 14.2916 10.3192C14.3926 9.90549 14.375 8.96691 14.6251 8.57629C14.7895 8.31881 15.2087 8.08664 15.4318 8.04923C15.7769 7.99201 16.2008 7.9744 16.5636 8.04043C16.8559 8.09434 17.2517 8.42003 17.3585 8.57629C17.6144 8.9548 17.76 10.0254 17.8034 10.4006C17.8211 10.5558 17.8903 9.96931 18.1475 9.59079C18.6242 8.88769 20.3114 8.75124 20.376 10.2939C20.4054 11.0135 20.3995 10.9805 20.3995 11.4647C20.3995 12.0335 20.3855 12.3757 20.3526 12.7872C20.3161 13.2274 20.2152 14.222 20.0684 14.7041C20.0023 14.9208 19.8362 15.3146 19.6368 15.6862C19.4365 16.0595 19.1574 16.3814 18.8863 16.7071C18.5057 17.1643 17.9896 17.8381 17.9045 18.2218C17.7659 18.8401 17.8117 18.8446 17.7847 19.2836C17.7658 19.59 17.8429 19.9643 17.8909 20.1614C17.9084 20.2334 17.8602 20.3059 17.7865 20.3134C17.505 20.3417 16.8649 20.3946 16.4779 20.3366C16.0188 20.2673 15.4505 19.4112 15.3037 19.1494C15.1018 18.7884 14.6708 18.8578 14.503 19.124C14.2388 19.5455 13.6705 20.3014 13.269 20.3488C12.514 20.4377 10.9776 20.3869 9.72746 20.3723C9.65243 20.3714 9.59565 20.3027 9.60515 20.2283C9.64502 19.9157 9.69386 19.1741 9.31679 18.8765C8.95867 18.5915 8.34224 18.0138 7.97357 17.7101L6.99667 16.6967Z"
-                    fill="#ffffff"
-                    stroke="#111111"
-                    stroke-width="0.96"
-                  />
-                  <path d="M16.68 17.04V13.32" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
-                  <path d="M14.52 17.04V13.32" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
-                  <path d="M11.88 13.32V17.04" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
-                </svg>
-              {:else if cursorPressed}
-                <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
-                  <path
-                    fill-rule="evenodd"
-                    clip-rule="evenodd"
-                    d="M7.68 6.33655C8.24671 6.11869 9.36478 6.25209 9.65994 6.9155C9.91142 7.48097 10.8361 9.39161 10.8479 9.18843C10.8762 8.73679 10.8195 7.76005 11.0096 7.24964C11.1478 6.87755 11.4193 6.52749 11.8195 6.40388C12.156 6.29861 12.5515 6.26189 12.901 6.33656C13.2706 6.41488 13.659 6.68783 13.8042 6.94732C14.2316 7.70986 14.2387 9.27166 14.2588 9.18843C14.3344 8.8555 14.3414 7.68416 14.5928 7.24964C14.7594 6.96201 15.1796 6.70497 15.404 6.66335C15.7511 6.59971 16.1785 6.58012 16.5421 6.65356C16.8361 6.71354 17.234 7.07462 17.3414 7.24964C17.6 7.67069 17.7452 8.8604 17.7889 9.27901C17.8078 9.45159 17.8763 8.79797 18.1348 8.37815C18.6142 7.59603 20.3119 7.44425 20.3756 9.16028C20.4064 9.96076 20.3993 9.92404 20.3993 10.4626C20.3993 11.0942 20.3851 11.4761 20.3521 11.9338C20.3166 12.4222 20.2151 13.5299 20.0675 14.066C19.966 14.4344 19.6295 15.263 19.2966 15.76C19.2966 15.76 18.0286 17.29 17.8904 17.9778C17.7523 18.667 17.7983 18.6719 17.77 19.159C17.7504 19.5113 17.8334 19.9432 17.8812 20.1565C17.8969 20.227 17.85 20.2969 17.7782 20.305C17.4988 20.3362 16.849 20.3962 16.456 20.3303C15.9943 20.2544 15.4229 19.3022 15.2753 19.0109C15.0722 18.6095 14.6389 18.6865 14.4701 18.9827C14.2056 19.4515 13.633 20.2924 13.2304 20.345C12.4693 20.444 10.9224 20.3863 9.66472 20.3711C9.59057 20.3701 9.5341 20.3034 9.54294 20.2298C9.58328 19.8941 9.64139 19.0446 9.25519 18.7073C8.8951 18.3892 8.27525 17.7478 7.90453 17.41L6.92224 16.2827C6.58811 15.842 5.73923 15.1456 5.4547 13.853C5.20321 12.7074 5.228 12.1456 5.49838 11.6866C5.77229 11.2202 6.2894 10.9657 6.50665 10.9216C6.75222 10.8702 7.32365 10.8739 7.53971 10.9975C7.803 11.148 7.90925 11.1921 8.11586 11.4761C8.38741 11.8518 8.48423 12.0342 8.36734 11.6242C8.27761 11.3035 7.98718 10.8959 7.85494 10.4369C7.72625 9.99503 6.67291 8.32552 6.6977 7.61194C6.70715 7.34144 6.81931 6.66825 7.68 6.33655Z"
-                    fill="#ffffff"
-                    stroke="#111111"
-                    stroke-width="0.96"
-                  />
-                  <path d="M16.7797 16.5684V12.6287" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
-                  <path d="M14.3306 16.5684V12.6287" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
-                  <path d="M11.9882 12.6287V16.5684" stroke="#111111" stroke-width="0.84" stroke-linecap="round"/>
-                </svg>
-              {:else}
-                <svg viewBox="0 0 396 433" width="27" height="30" aria-hidden="true">
-                  <path
-                    d="M39.9744 31.8759C38.2182 23.4825 47.2034 16.9545 54.6432 21.2183L351.11 191.127C358.653 195.45 357.401 206.692 349.09 209.248L205.199 253.511C202.971 254.196 201.054 255.643 199.785 257.599L127.77 368.534C122.94 375.973 111.523 373.84 109.707 365.158L39.9744 31.8759Z"
-                    fill="#333333"
-                  />
-                  <path
-                    d="M346.169 199.749L202.277 244.012C197.821 245.383 193.988 248.277 191.449 252.188L119.434 363.121L49.7012 29.8407L346.169 199.749Z"
-                    stroke="#ffffff"
-                    stroke-width="19.8759"
-                  />
-                </svg>
-              {/if}
             </div>
-          </div>
-          </div>
-        </div>
-
-          <div class="step-2-actions">
-            <button class="cta" onclick={() => dismiss('cta')}>
-              Try it out
-            </button>
           </div>
         </div>
       </div>
-    </div>
-  </dialog>
+    </section>
+  </div>
 {/if}
 
 <!-- "?" reopen button — appears once the modal has been dismissed (this session or prior) -->
@@ -748,53 +779,30 @@
 {/if}
 
 <style>
-  .welcome-dialog {
-    border: none;
-    padding: 0;
-    background: transparent;
-    max-width: none;
-    max-height: none;
-    margin: auto;
-    color: inherit;
-    overflow: visible;
-    outline: none;
-  }
-  .welcome-dialog:focus,
-  .welcome-dialog:focus-visible {
-    outline: none;
+  .welcome-layer {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 55;
+    pointer-events: none;
   }
 
-  .welcome-dialog::backdrop {
-    background: rgba(17, 24, 39, 0.16);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-
-  /* Subtle entry animation for the dialog itself */
-  .welcome-dialog[open] {
-    animation: dialog-in 360ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .welcome-dialog[open]::backdrop {
-    animation: backdrop-in 280ms ease-out;
-  }
-
-  @keyframes dialog-in {
+  @keyframes panel-dock-in {
     from { opacity: 0; transform: translateY(8px) scale(0.98); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
-  }
-  @keyframes backdrop-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
   }
 
   .modal-panel {
     position: relative;
+    pointer-events: auto;
     background: var(--color-surface, #fafbfe);
     border-radius: 20px;
     box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.5);
     color: #111827;
     font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
     overflow: hidden;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    animation: panel-dock-in 360ms cubic-bezier(0.16, 1, 0.3, 1);
     /* Sequenced grow: starts AFTER step 1 finishes fading out (500ms) */
     transition:
       width 600ms cubic-bezier(0.16, 1, 0.3, 1) 500ms,
@@ -807,12 +815,12 @@
 
   /* Panel sizes per step */
   .modal-panel.is-step1 {
-    width: min(480px, calc(100vw - 24px));
-    height: min(250px, calc(100dvh - 24px));
+    width: min(380px, calc(100vw - 24px));
+    height: min(196px, calc(100dvh - 24px));
   }
   .modal-panel.is-step2 {
-    width: min(556px, calc(100vw - 24px));
-    height: min(524px, calc(100dvh - 24px));
+    width: min(var(--step-2-panel-width), calc(100vw - 24px));
+    height: min(var(--step-2-panel-height), calc(100dvh - 24px));
   }
 
   /* Both steps absolutely positioned. Sequenced opacity crossfade:
@@ -840,7 +848,7 @@
 
   /* ─── Step 1: title card ─────────────────────────────────────────── */
   .step.step-1 {
-    padding: 34px 34px 30px;
+    padding: 34px 54px 30px 34px;
   }
 
   .step-1-content {
@@ -869,41 +877,23 @@
 
   /* ─── Step 2: demo ───────────────────────────────────────────────── */
   .step.step-2 {
-    padding: 24px 18px 22px;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 0;
+  }
+
+  .step-2-stage {
+    transform: scale(var(--step-2-scale));
+    transform-origin: top left;
   }
 
   .step-2-layout {
     width: 100%;
     height: 100%;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    justify-items: center;
-    align-items: start;
-    gap: 14px;
-  }
-
-  .step-2-header {
-    width: min(100%, 492px);
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .step-2-logo {
-    font-size: 22px;
-    line-height: 1;
-    color: #111827;
-    letter-spacing: -0.01em;
-    flex-shrink: 0;
   }
 
   .step-2-caption {
     margin: 0;
-    font-size: 12px;
-    line-height: 1.45;
-    color: var(--color-ink-secondary, #6b7280);
-    text-align: right;
     text-wrap: balance;
   }
 
@@ -913,12 +903,6 @@
     flex-shrink: 0;
     overflow: hidden;
     align-self: center;
-  }
-
-  .step-2-actions {
-    width: min(100%, 492px);
-    display: flex;
-    justify-content: center;
   }
 
   .demo-canvas {
@@ -938,7 +922,7 @@
 
   .frame-label {
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 9px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: rgba(17, 24, 39, 0.4);
@@ -1065,7 +1049,7 @@
     border-radius: 7px;
     color: rgba(17, 24, 39, 0.62);
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 9.8px;
+    font-size: 11.8px;
     line-height: 1.22;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
@@ -1100,7 +1084,7 @@
     min-width: 68px;
     height: 30px;
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 9.5px;
+    font-size: 11.4px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -1115,27 +1099,6 @@
     background: #f0fdf4;
     color: #15803d;
     border-color: rgba(21, 128, 61, 0.25);
-  }
-
-  /* ─── CTA ────────────────────────────────────────────────────────── */
-  .cta {
-    margin-top: 6px;
-    background: var(--color-art-500, #2563eb);
-    color: white;
-    font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
-    font-size: 14px;
-    font-weight: 500;
-    padding: 12px 28px;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background-color 200ms ease, transform 200ms ease;
-  }
-  .cta:hover {
-    background: var(--color-art-600, #1d4ed8);
-  }
-  .cta:active {
-    transform: scale(0.98);
   }
 
   /* ─── Reopen "?" button ──────────────────────────────────────────── */
@@ -1160,33 +1123,18 @@
 
   /* ─── Mobile adaptations ─────────────────────────────────────────── */
   @media (max-width: 560px) {
+    .welcome-layer {
+      right: 12px;
+      bottom: 12px;
+    }
+
     .step.step-1 {
-      padding: 30px 22px 26px;
+      padding: 30px 46px 26px 22px;
     }
 
     .step.step-2 {
-      padding: 20px 10px 18px;
-      gap: 12px;
+      padding: 0;
     }
 
-    .step-2-header {
-      width: 100%;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .step-2-logo {
-      font-size: 20px;
-    }
-
-    .step-2-caption {
-      text-align: center;
-      font-size: 11px;
-    }
-
-    .step-2-actions {
-      width: 100%;
-    }
   }
 </style>

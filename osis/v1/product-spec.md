@@ -210,7 +210,26 @@ Each successful use reinforces the mental model that responsive image compositio
 | Sidebar shows persisted directions | Recent images available across sessions |
 | Welcome modal flag moves to Dexie | Consistent with persistence layer |
 
-### Phase 3 — Beyond Images
+### Phase 3 — Devices (April 2026)
+
+**Goal:** Give Preview a Chrome DevTools-parity device picker with search and persisted pinned favorites, and collapse Art Direct's device data down to a single canonical source.
+
+**Signal:** The current 7-preset Preview strip and 13-device Compose list both feel constraining. Preview reads like a glorified iframe with 7 hardcoded sizes rather than a real verifier, and the two lists drift against each other.
+
+| Component | Tier | Notes |
+|-----------|------|-------|
+| Unified canonical device data module (Chromium-lifted) | T1 | Single source of truth for both Preview and Compose |
+| Preview device strip = pinned devices | T1 | Replaces hardcoded 7-preset strip |
+| "More devices…" searchable picker | T1 | Full Chromium list, star to pin/unpin |
+| Pin persistence via Dexie Preferences | T1 | Global pin set, survives refresh |
+| Default pin seed on fresh install | T1 | Current 7 presets — no regression |
+| EditView Devices mode rewired to unified module | T1 | No UX change in Compose |
+
+**Does not ship:** Arbitrary `min-[Wpx]:` Tailwind output (Compose stays standard breakpoints), custom user-defined devices, per-direction pin sets, DPR or user-agent emulation, live-syncing with upstream Chromium device list.
+
+**Success looks like:** Pinned set persists across refresh and return visit. Full Chromium device list accessible from Preview in under 2 clicks. Compose Devices/Tailwind toggle behaves identically to before. Default Preview strip on a fresh install matches the current 7 presets exactly.
+
+### Phase 4 — Beyond Images
 
 **Goal:** Extend the visual-first responsive authoring model to other CSS properties.
 
