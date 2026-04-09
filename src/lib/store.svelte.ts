@@ -114,7 +114,8 @@ function createStore() {
   // --- Live drag activity (drives the OutputPanel marching-ants border) ---
   // Frames push raw pointer deltas while a drag is in flight; OutputPanel
   // reads these to march its dashed border in lockstep with the cursor.
-  let isDragging = $state(false)
+  let dragDepth = $state(0)
+  const isDragging = $derived(dragDepth > 0)
   let dragOffset = $state(0)
 
   // --- Welcome flag (persisted to Dexie; see persistence.ts) ---
@@ -366,11 +367,11 @@ function createStore() {
     },
 
     beginDrag() {
-      isDragging = true
+      dragDepth += 1
     },
 
     endDrag() {
-      isDragging = false
+      dragDepth = Math.max(0, dragDepth - 1)
     },
 
     addDragDelta(dx: number, dy: number) {
